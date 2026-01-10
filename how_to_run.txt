@@ -1,0 +1,15 @@
+Open Docker Desktop
+
+Open Project Directory
+
+Open cmd
+
+Run Docker Container For your project Using: 
+docker run -it --rm -p 5173:5173 -v "%cd%":/app -w /app node:24-alpine sh
+
+Install dependencies:
+npm install
+
+Start Vite:
+npm run dev -- --host
+
