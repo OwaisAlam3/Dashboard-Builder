@@ -1,3 +1,4 @@
+// src/components/Widgets/BaseWidget.jsx
 import React, { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { 
   Lock, 
@@ -9,41 +10,46 @@ import {
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { WIDGET_COMPONENTS } from './index';
+import GRID_CONFIG from '../../config/gridConfig';
 
-const MIN_SIZE = { width: 100, height: 80 };
-
-const BaseWidget = memo(({ widget }) => {
+const BaseWidget = memo(({ widget, containerWidth, gridColumns }) => {
   const widgetRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeDirection, setResizeDirection] = useState(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [initialPos, setInitialPos] = useState({ x: 0, y: 0 });
-  const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+  const [initialGridArea, setInitialGridArea] = useState(null);
   const [showToolbar, setShowToolbar] = useState(false);
+  const [ghostPosition, setGhostPosition] = useState(null);
 
   const {
     selectedWidgetIds,
     selectWidget,
-    updateWidget,
+    updateWidgetGridArea,
     deleteWidget,
     duplicateWidget,
     toggleWidgetLock,
     bringToFront,
     sendToBack,
-    canvasZoom,
     setHoveredWidget,
     setIsDragging: setGlobalDragging,
     setIsResizing: setGlobalResizing,
+    checkCollision,
   } = useDashboardStore();
 
   const WidgetComponent = WIDGET_COMPONENTS[widget.type];
   const isSelected = selectedWidgetIds.includes(widget.id);
   const isLocked = widget.locked;
 
+  // Calculate pixel positions from grid coordinates
+  const columnWidth = GRID_CONFIG.getPixelWidth(1, containerWidth, gridColumns);
+  const pixelX = widget.gridArea.x * (columnWidth + GRID_CONFIG.gap);
+  const pixelY = widget.gridArea.y * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap);
+  const pixelWidth = GRID_CONFIG.getPixelWidth(widget.gridArea.w, containerWidth, gridColumns);
+  const pixelHeight = GRID_CONFIG.getPixelHeight(widget.gridArea.h);
+
   // Handle widget click
   const handleWidgetClick = useCallback((e) => {
-    // Prevent selection when clicking on interactive elements
     if (
       e.target.tagName === 'INPUT' ||
       e.target.tagName === 'TEXTAREA' ||
@@ -63,7 +69,6 @@ const BaseWidget = memo(({ widget }) => {
   const handleMouseDown = useCallback((e) => {
     if (isLocked || e.button !== 0) return;
     
-    // Don't start drag on resize handles or interactive elements
     if (
       e.target.closest('.resize-handle') ||
       e.target.tagName === 'INPUT' ||
@@ -79,17 +84,17 @@ const BaseWidget = memo(({ widget }) => {
     e.stopPropagation();
 
     setIsDragging(true);
-    setGlobalDragging(true);
+    setGlobalDragging(true, widget.id);
     setDragStart({ x: e.clientX, y: e.clientY });
-    setInitialPos({ ...widget.position });
+    setInitialGridArea({ ...widget.gridArea });
+    setGhostPosition({ ...widget.gridArea });
     
-    // Select if not already selected
     if (!isSelected) {
       selectWidget(widget.id, e.metaKey || e.ctrlKey || e.shiftKey);
     }
 
     document.body.classList.add('is-dragging');
-  }, [isLocked, widget.position, widget.id, isSelected, selectWidget, setGlobalDragging]);
+  }, [isLocked, widget.gridArea, widget.id, isSelected, selectWidget, setGlobalDragging]);
 
   // Handle resize start
   const handleResizeStart = useCallback((direction) => (e) => {
@@ -102,72 +107,84 @@ const BaseWidget = memo(({ widget }) => {
     setGlobalResizing(true);
     setResizeDirection(direction);
     setDragStart({ x: e.clientX, y: e.clientY });
-    setInitialPos({ ...widget.position });
-    setInitialSize({ ...widget.size });
+    setInitialGridArea({ ...widget.gridArea });
+    setGhostPosition({ ...widget.gridArea });
 
     document.body.classList.add('is-dragging');
-  }, [isLocked, widget.position, widget.size, setGlobalResizing]);
+  }, [isLocked, widget.gridArea, setGlobalResizing]);
 
   // Handle mouse move (drag & resize)
   useEffect(() => {
     if (!isDragging && !isResizing) return;
 
     const handleMouseMove = (e) => {
-      const deltaX = (e.clientX - dragStart.x) / canvasZoom;
-      const deltaY = (e.clientY - dragStart.y) / canvasZoom;
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
 
       if (isDragging) {
-        const newX = initialPos.x + deltaX;
-        const newY = initialPos.y + deltaY;
-        updateWidget(widget.id, {
-          position: { x: newX, y: newY }
-        });
+        // Convert pixel delta to grid delta
+        const gridDeltaX = Math.round(deltaX / (columnWidth + GRID_CONFIG.gap));
+        const gridDeltaY = Math.round(deltaY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
+
+        const newGridArea = {
+          x: Math.max(0, Math.min(initialGridArea.x + gridDeltaX, gridColumns - initialGridArea.w)),
+          y: Math.max(0, initialGridArea.y + gridDeltaY),
+          w: initialGridArea.w,
+          h: initialGridArea.h,
+        };
+
+        setGhostPosition(newGridArea);
+
       } else if (isResizing && resizeDirection) {
-        let newWidth = initialSize.width;
-        let newHeight = initialSize.height;
-        let newX = initialPos.x;
-        let newY = initialPos.y;
+        const gridDeltaX = Math.round(deltaX / (columnWidth + GRID_CONFIG.gap));
+        const gridDeltaY = Math.round(deltaY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
+
+        let newGridArea = { ...initialGridArea };
 
         if (resizeDirection.includes('e')) {
-          newWidth = Math.max(MIN_SIZE.width, initialSize.width + deltaX);
+          newGridArea.w = Math.max(GRID_CONFIG.minWidgetWidth, Math.min(initialGridArea.w + gridDeltaX, gridColumns - initialGridArea.x));
         }
         if (resizeDirection.includes('w')) {
-          const widthChange = initialSize.width - deltaX;
-          if (widthChange >= MIN_SIZE.width) {
-            newWidth = widthChange;
-            newX = initialPos.x + deltaX;
-          }
+          const newWidth = Math.max(GRID_CONFIG.minWidgetWidth, initialGridArea.w - gridDeltaX);
+          const widthChange = initialGridArea.w - newWidth;
+          newGridArea.w = newWidth;
+          newGridArea.x = Math.max(0, initialGridArea.x + widthChange);
         }
         if (resizeDirection.includes('s')) {
-          newHeight = Math.max(MIN_SIZE.height, initialSize.height + deltaY);
+          newGridArea.h = Math.max(GRID_CONFIG.minWidgetHeight, initialGridArea.h + gridDeltaY);
         }
         if (resizeDirection.includes('n')) {
-          const heightChange = initialSize.height - deltaY;
-          if (heightChange >= MIN_SIZE.height) {
-            newHeight = heightChange;
-            newY = initialPos.y + deltaY;
-          }
+          const newHeight = Math.max(GRID_CONFIG.minWidgetHeight, initialGridArea.h - gridDeltaY);
+          const heightChange = initialGridArea.h - newHeight;
+          newGridArea.h = newHeight;
+          newGridArea.y = Math.max(0, initialGridArea.y + heightChange);
         }
 
-        updateWidget(widget.id, {
-          position: { x: newX, y: newY },
-          size: { width: newWidth, height: newHeight },
-        });
+        setGhostPosition(newGridArea);
       }
     };
 
     const handleMouseUp = () => {
+      if (isDragging || isResizing) {
+        if (ghostPosition) {
+          // Check for collision before finalizing
+          const hasCollision = checkCollision({ gridArea: ghostPosition }, widget.id);
+          
+          if (!hasCollision) {
+            updateWidgetGridArea(widget.id, ghostPosition, false);
+            useDashboardStore.getState().saveToHistory();
+            useDashboardStore.getState().saveToLocalStorage();
+          }
+        }
+      }
+
       setIsDragging(false);
       setIsResizing(false);
       setGlobalDragging(false);
       setGlobalResizing(false);
       setResizeDirection(null);
+      setGhostPosition(null);
       document.body.classList.remove('is-dragging');
-      
-      if (isDragging || isResizing) {
-        useDashboardStore.getState().saveToHistory();
-        useDashboardStore.getState().saveToLocalStorage();
-      }
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -182,13 +199,15 @@ const BaseWidget = memo(({ widget }) => {
     isResizing,
     resizeDirection,
     dragStart,
-    initialPos,
-    initialSize,
+    initialGridArea,
     widget.id,
-    canvasZoom,
-    updateWidget,
+    columnWidth,
+    gridColumns,
+    updateWidgetGridArea,
     setGlobalDragging,
     setGlobalResizing,
+    checkCollision,
+    ghostPosition,
   ]);
 
   // Toolbar actions
@@ -229,120 +248,161 @@ const BaseWidget = memo(({ widget }) => {
     { dir: 'sw', className: 'resize-handle-sw' },
   ];
 
-  return (
-    <div
-      ref={widgetRef}
-      className={`absolute select-none gpu-accelerated ${
-        isLocked ? 'cursor-not-allowed' : 'cursor-grab'
-      } ${isDragging ? 'widget-dragging' : isSelected ? 'widget-selected' : 'widget-idle'}`}
-      style={{
-        left: widget.position.x,
-        top: widget.position.y,
-        width: widget.size.width,
-        height: widget.size.height,
-        zIndex: widget.zIndex,
-        opacity: widget.opacity,
-        transform: `rotate(${widget.rotation || 0}deg)`,
-        pointerEvents: 'auto',
-      }}
-      onMouseDown={handleMouseDown}
-      onClick={handleWidgetClick}
-      onMouseEnter={() => {
-        setHoveredWidget(widget.id);
-        setShowToolbar(true);
-      }}
-      onMouseLeave={() => {
-        setHoveredWidget(null);
-        setShowToolbar(false);
-      }}
-    >
-      {/* Selection Border */}
-      {isSelected && !isDragging && (
-        <div className="absolute -inset-0.5 border-2 border-accent-blue rounded pointer-events-none" />
-      )}
+  // Calculate ghost position pixels
+  const ghostPixelX = ghostPosition ? ghostPosition.x * (columnWidth + GRID_CONFIG.gap) : null;
+  const ghostPixelY = ghostPosition ? ghostPosition.y * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap) : null;
+  const ghostPixelWidth = ghostPosition ? GRID_CONFIG.getPixelWidth(ghostPosition.w, containerWidth, gridColumns) : null;
+  const ghostPixelHeight = ghostPosition ? GRID_CONFIG.getPixelHeight(ghostPosition.h) : null;
 
-      {/* Floating Toolbar */}
-      {(showToolbar || isSelected) && (
-        <div className="absolute -top-10 left-0 right-0 flex items-center justify-between px-2 py-1 floating-toolbar rounded-t-lg animate-slideIn no-print">
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-white/70 px-2">{widget.type}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            {!isLocked && (
-              <>
-                <button
-                  onClick={handleBringToFront}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                  title="Bring to Front"
-                >
-                  <MoveUp size={14} className="text-white" />
-                </button>
-                <button
-                  onClick={handleSendToBack}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                  title="Send to Back"
-                >
-                  <MoveDown size={14} className="text-white" />
-                </button>
-                <div className="w-px h-4 bg-white/20 mx-1" />
-              </>
-            )}
-            <button
-              onClick={handleLockToggle}
-              className="p-1 hover:bg-white/10 rounded transition-colors"
-              title={isLocked ? 'Unlock Widget' : 'Lock Widget'}
-            >
-              {isLocked ? 
-                <Lock size={14} className="text-yellow-400" /> : 
-                <Unlock size={14} className="text-white" />
-              }
-            </button>
-            {!isLocked && (
-              <>
-                <button
-                  onClick={handleDuplicate}
-                  className="p-1 hover:bg-white/10 rounded transition-colors"
-                  title="Duplicate (Cmd+D)"
-                >
-                  <Copy size={14} className="text-white" />
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                  title="Delete (Del)"
-                >
-                  <Trash2 size={14} className="text-red-400" />
-                </button>
-              </>
-            )}
+  // Check if ghost position has collision
+  const hasGhostCollision = ghostPosition ? checkCollision({ gridArea: ghostPosition }, widget.id) : false;
+
+  return (
+    <>
+      {/* Ghost Widget (shown during drag/resize) */}
+      {(isDragging || isResizing) && ghostPosition && (
+        <div
+          className={`absolute pointer-events-none rounded-lg border-2 transition-colors ${
+            hasGhostCollision 
+              ? 'border-red-500 bg-red-500/10' 
+              : 'border-accent-blue bg-accent-blue/10'
+          }`}
+          style={{
+            left: ghostPixelX,
+            top: ghostPixelY,
+            width: ghostPixelWidth,
+            height: ghostPixelHeight,
+            zIndex: 9999,
+          }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className={`text-xs font-medium px-2 py-1 rounded ${
+              hasGhostCollision ? 'bg-red-500 text-white' : 'bg-accent-blue text-white'
+            }`}>
+              {ghostPosition.w} × {ghostPosition.h}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Widget Content */}
-      <div className="w-full h-full bg-white rounded-lg shadow-widget overflow-hidden">
-        {WidgetComponent ? (
-          <WidgetComponent data={widget.data} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-            <p className="text-gray-500 text-sm">Widget not found</p>
+      {/* Actual Widget */}
+      <div
+        ref={widgetRef}
+        className={`absolute select-none transition-opacity ${
+          isLocked ? 'cursor-not-allowed' : 'cursor-grab'
+        } ${(isDragging || isResizing) ? 'opacity-50' : ''} ${isSelected ? 'widget-selected' : 'widget-idle'}`}
+        style={{
+          left: pixelX,
+          top: pixelY,
+          width: pixelWidth,
+          height: pixelHeight,
+          zIndex: widget.zIndex,
+          opacity: (isDragging || isResizing) ? 0.5 : widget.opacity,
+          transform: `rotate(${widget.rotation || 0}deg)`,
+          pointerEvents: 'auto',
+        }}
+        onMouseDown={handleMouseDown}
+        onClick={handleWidgetClick}
+        onMouseEnter={() => {
+          setHoveredWidget(widget.id);
+          setShowToolbar(true);
+        }}
+        onMouseLeave={() => {
+          setHoveredWidget(null);
+          setShowToolbar(false);
+        }}
+      >
+        {/* Selection Border */}
+        {isSelected && !isDragging && !isResizing && (
+          <div className="absolute -inset-0.5 border-2 border-accent-blue rounded-lg pointer-events-none" />
+        )}
+
+        {/* Floating Toolbar */}
+        {(showToolbar || isSelected) && !isDragging && !isResizing && (
+          <div className="absolute -top-10 left-0 right-0 flex items-center justify-between px-2 py-1 floating-toolbar rounded-t-lg animate-slideIn no-print z-50">
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-white/70 px-2">{widget.type}</span>
+              <span className="text-xs text-white/40">
+                {widget.gridArea.w}×{widget.gridArea.h}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {!isLocked && (
+                <>
+                  <button
+                    onClick={handleBringToFront}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Bring to Front"
+                  >
+                    <MoveUp size={14} className="text-white" />
+                  </button>
+                  <button
+                    onClick={handleSendToBack}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Send to Back"
+                  >
+                    <MoveDown size={14} className="text-white" />
+                  </button>
+                  <div className="w-px h-4 bg-white/20 mx-1" />
+                </>
+              )}
+              <button
+                onClick={handleLockToggle}
+                className="p-1 hover:bg-white/10 rounded transition-colors"
+                title={isLocked ? 'Unlock Widget' : 'Lock Widget'}
+              >
+                {isLocked ? 
+                  <Lock size={14} className="text-yellow-400" /> : 
+                  <Unlock size={14} className="text-white" />
+                }
+              </button>
+              {!isLocked && (
+                <>
+                  <button
+                    onClick={handleDuplicate}
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Duplicate (Cmd+D)"
+                  >
+                    <Copy size={14} className="text-white" />
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Delete (Del)"
+                  >
+                    <Trash2 size={14} className="text-red-400" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Resize Handles */}
-      {isSelected && !isLocked && !isDragging && (
-        <>
-          {resizeHandles.map((handle) => (
-            <div
-              key={handle.dir}
-              className={`resize-handle ${handle.className}`}
-              onMouseDown={handleResizeStart(handle.dir)}
-            />
-          ))}
-        </>
-      )}
-    </div>
+        {/* Widget Content */}
+        <div className="w-full h-full bg-white rounded-lg shadow-widget overflow-hidden">
+          {WidgetComponent ? (
+            <WidgetComponent data={widget.data} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+              <p className="text-gray-500 text-sm">Widget not found</p>
+            </div>
+          )}
+        </div>
+
+        {/* Resize Handles */}
+        {isSelected && !isLocked && !isDragging && !isResizing && (
+          <>
+            {resizeHandles.map((handle) => (
+              <div
+                key={handle.dir}
+                className={`resize-handle ${handle.className} bg-accent-blue hover:bg-accent-blue/80`}
+                onMouseDown={handleResizeStart(handle.dir)}
+              />
+            ))}
+          </>
+        )}
+      </div>
+    </>
   );
 });
 

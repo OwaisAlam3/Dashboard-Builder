@@ -1,7 +1,9 @@
+// src/components/Dashboard/PropertyPanel.jsx
 import React, { useMemo, useCallback } from 'react';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { WIDGET_TYPES } from '../../config/widgetRegistry';
+import GRID_CONFIG from '../../config/gridConfig';
 
 const PropertyPanel = () => {
   const { 
@@ -10,7 +12,9 @@ const PropertyPanel = () => {
     deselectAll, 
     updateWidget,
     updateWidgetData,
-    propertyPanelOpen 
+    updateWidgetGridArea,
+    propertyPanelOpen,
+    gridColumns,
   } = useDashboardStore();
 
   const [expandedSections, setExpandedSections] = React.useState({
@@ -41,36 +45,34 @@ const PropertyPanel = () => {
     }));
   };
 
-  // FIXED: Prevent event bubbling
   const handleDataChange = useCallback((key, value) => {
     if (selectedWidget) {
       updateWidgetData(selectedWidget.id, { [key]: value });
     }
   }, [selectedWidget, updateWidgetData]);
 
-  const handlePositionChange = useCallback((axis, value) => {
+  const handleGridChange = useCallback((axis, value) => {
     if (selectedWidget) {
-      updateWidget(selectedWidget.id, {
-        position: {
-          ...selectedWidget.position,
-          [axis]: parseFloat(value) || 0
-        }
-      });
+      const newGridArea = {
+        ...selectedWidget.gridArea,
+        [axis]: Math.max(0, parseInt(value) || 0)
+      };
+      
+      // Constrain within bounds
+      if (axis === 'x') {
+        newGridArea.x = Math.min(newGridArea.x, gridColumns - newGridArea.w);
+      }
+      if (axis === 'w') {
+        newGridArea.w = Math.max(GRID_CONFIG.minWidgetWidth, Math.min(parseInt(value) || 1, gridColumns - newGridArea.x));
+      }
+      if (axis === 'h') {
+        newGridArea.h = Math.max(GRID_CONFIG.minWidgetHeight, parseInt(value) || 1);
+      }
+      
+      updateWidgetGridArea(selectedWidget.id, newGridArea, true);
     }
-  }, [selectedWidget, updateWidget]);
+  }, [selectedWidget, updateWidgetGridArea, gridColumns]);
 
-  const handleSizeChange = useCallback((dimension, value) => {
-    if (selectedWidget) {
-      updateWidget(selectedWidget.id, {
-        size: {
-          ...selectedWidget.size,
-          [dimension]: parseFloat(value) || 100
-        }
-      });
-    }
-  }, [selectedWidget, updateWidget]);
-
-  // FIXED: Stop propagation on all inputs
   const stopPropagation = (e) => {
     e.stopPropagation();
   };
@@ -97,22 +99,29 @@ const PropertyPanel = () => {
     </div>
   );
 
-  const Input = ({ label, value, onChange, type = "text", min, max, step = 1 }) => (
+  const Input = ({ label, value, onChange, type = "number", min, max, step = 1, suffix = '' }) => (
     <div>
       <label className="block text-xs font-medium text-white/70 mb-1.5">
         {label}
       </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onMouseDown={stopPropagation}
-        onKeyDown={stopPropagation}
-        min={min}
-        max={max}
-        step={step}
-        className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors"
-      />
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onMouseDown={stopPropagation}
+          onKeyDown={stopPropagation}
+          min={min}
+          max={max}
+          step={step}
+          className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors"
+        />
+        {suffix && (
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-white/40">
+            {suffix}
+          </span>
+        )}
+      </div>
     </div>
   );
 
@@ -215,53 +224,54 @@ const PropertyPanel = () => {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        {/* Position & Size */}
-        <Section title="Position & Size" section="position">
+        {/* Grid Position & Size */}
+        <Section title="Grid Position" section="position">
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="X"
-              type="number"
-              value={selectedWidget.position.x}
-              onChange={(val) => handlePositionChange('x', val)}
+              label="Column (X)"
+              value={selectedWidget.gridArea.x}
+              onChange={(val) => handleGridChange('x', val)}
+              min={0}
+              max={gridColumns - selectedWidget.gridArea.w}
             />
             <Input
-              label="Y"
-              type="number"
-              value={selectedWidget.position.y}
-              onChange={(val) => handlePositionChange('y', val)}
+              label="Row (Y)"
+              value={selectedWidget.gridArea.y}
+              onChange={(val) => handleGridChange('y', val)}
+              min={0}
             />
           </div>
         </Section>
 
-        <Section title="Size" section="size">
+        <Section title="Grid Size" section="size">
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="Width"
-              type="number"
-              value={selectedWidget.size.width}
-              onChange={(val) => handleSizeChange('width', val)}
-              min={100}
+              label="Width (Columns)"
+              value={selectedWidget.gridArea.w}
+              onChange={(val) => handleGridChange('w', val)}
+              min={GRID_CONFIG.minWidgetWidth}
+              max={gridColumns}
+              suffix="cols"
             />
             <Input
-              label="Height"
-              type="number"
-              value={selectedWidget.size.height}
-              onChange={(val) => handleSizeChange('height', val)}
-              min={80}
+              label="Height (Rows)"
+              value={selectedWidget.gridArea.h}
+              onChange={(val) => handleGridChange('h', val)}
+              min={GRID_CONFIG.minWidgetHeight}
+              suffix="rows"
             />
           </div>
           <Input
             label="Rotation"
-            type="number"
             value={selectedWidget.rotation || 0}
             onChange={(val) => updateWidget(selectedWidget.id, { rotation: parseFloat(val) || 0 })}
             min={-180}
             max={180}
             step={1}
+            suffix="°"
           />
           <Input
             label="Opacity"
-            type="number"
             value={selectedWidget.opacity || 1}
             onChange={(val) => updateWidget(selectedWidget.id, { opacity: Math.max(0, Math.min(1, parseFloat(val) || 1)) })}
             min={0}
@@ -270,12 +280,13 @@ const PropertyPanel = () => {
           />
         </Section>
 
-        {/* Widget-Specific Properties - Same as before */}
+        {/* Widget-Specific Properties */}
         {selectedWidget.type === 'container' && (
           <>
             <Section title="Content" section="content">
               <Input
                 label="Title"
+                type="text"
                 value={selectedWidget.data.title || ''}
                 onChange={(val) => handleDataChange('title', val)}
               />
@@ -293,31 +304,19 @@ const PropertyPanel = () => {
               />
               <Input
                 label="Border Width"
-                type="number"
                 value={selectedWidget.data.borderWidth || 1}
                 onChange={(val) => handleDataChange('borderWidth', parseFloat(val))}
                 min={0}
                 max={10}
+                suffix="px"
               />
               <Input
                 label="Border Radius"
-                type="number"
                 value={selectedWidget.data.borderRadius || 8}
                 onChange={(val) => handleDataChange('borderRadius', parseFloat(val))}
                 min={0}
                 max={50}
-              />
-              <Select
-                label="Shadow"
-                value={selectedWidget.data.shadow || 'md'}
-                onChange={(val) => handleDataChange('shadow', val)}
-                options={[
-                  { value: 'none', label: 'None' },
-                  { value: 'sm', label: 'Small' },
-                  { value: 'md', label: 'Medium' },
-                  { value: 'lg', label: 'Large' },
-                  { value: 'xl', label: 'Extra Large' },
-                ]}
+                suffix="px"
               />
             </Section>
           </>
@@ -328,6 +327,7 @@ const PropertyPanel = () => {
             <Section title="Content" section="content">
               <Input
                 label="Title"
+                type="text"
                 value={selectedWidget.data.title || ''}
                 onChange={(val) => handleDataChange('title', val)}
               />
@@ -374,21 +374,25 @@ const PropertyPanel = () => {
             <Section title="Content" section="content">
               <Input
                 label="Label"
+                type="text"
                 value={selectedWidget.data.title || ''}
                 onChange={(val) => handleDataChange('title', val)}
               />
               <Input
                 label="Value"
+                type="text"
                 value={selectedWidget.data.value || ''}
                 onChange={(val) => handleDataChange('value', val)}
               />
               <Input
                 label="Change"
+                type="text"
                 value={selectedWidget.data.change || ''}
                 onChange={(val) => handleDataChange('change', val)}
               />
               <Input
                 label="Description"
+                type="text"
                 value={selectedWidget.data.description || ''}
                 onChange={(val) => handleDataChange('description', val)}
               />
@@ -396,13 +400,8 @@ const PropertyPanel = () => {
             <Section title="Appearance" section="appearance">
               <ColorInput
                 label="Background Color"
-                value={selectedWidget.data.bgColor || '#ffffff'}
+                value={selectedWidget.data.bgColor || '#3b82f6'}
                 onChange={(val) => handleDataChange('bgColor', val)}
-              />
-              <ColorInput
-                label="Accent Color"
-                value={selectedWidget.data.accentColor || '#3b82f6'}
-                onChange={(val) => handleDataChange('accentColor', val)}
               />
               <Select
                 label="Icon"
@@ -426,6 +425,7 @@ const PropertyPanel = () => {
             <Section title="Content" section="content">
               <Input
                 label="Title"
+                type="text"
                 value={selectedWidget.data.title || ''}
                 onChange={(val) => handleDataChange('title', val)}
               />
@@ -476,11 +476,13 @@ const PropertyPanel = () => {
             <Section title="Content" section="content">
               <Input
                 label="Image URL"
+                type="text"
                 value={selectedWidget.data.url || ''}
                 onChange={(val) => handleDataChange('url', val)}
               />
               <Input
                 label="Alt Text"
+                type="text"
                 value={selectedWidget.data.alt || ''}
                 onChange={(val) => handleDataChange('alt', val)}
               />
@@ -499,11 +501,11 @@ const PropertyPanel = () => {
               />
               <Input
                 label="Border Radius"
-                type="number"
                 value={selectedWidget.data.borderRadius || 8}
                 onChange={(val) => handleDataChange('borderRadius', parseFloat(val))}
                 min={0}
                 max={50}
+                suffix="px"
               />
               <Checkbox
                 label="Show Caption"
@@ -513,6 +515,7 @@ const PropertyPanel = () => {
               {selectedWidget.data.showCaption && (
                 <Input
                   label="Caption"
+                  type="text"
                   value={selectedWidget.data.caption || ''}
                   onChange={(val) => handleDataChange('caption', val)}
                 />
@@ -526,6 +529,7 @@ const PropertyPanel = () => {
             <Section title="Content" section="content">
               <Input
                 label="Title"
+                type="text"
                 value={selectedWidget.data.title || ''}
                 onChange={(val) => handleDataChange('title', val)}
               />

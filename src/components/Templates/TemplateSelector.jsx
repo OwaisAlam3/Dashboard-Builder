@@ -1,0 +1,154 @@
+// src/components/Templates/TemplateSelector.jsx
+import React, { useState } from 'react';
+import { X, Search, Sparkles } from 'lucide-react';
+import { DASHBOARD_TEMPLATES, TEMPLATE_CATEGORIES } from '../../config/dashboardTemplates';
+import useDashboardStore from '../../store/dashboardStore';
+
+const TemplateSelector = () => {
+  const { setShowTemplateSelector, loadTemplate } = useDashboardStore();
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredTemplates = Object.values(DASHBOARD_TEMPLATES).filter(template => {
+    const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory || template.id === 'blank';
+    const matchesSearch = 
+      template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      template.description.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleSelectTemplate = (template) => {
+    loadTemplate(template);
+    setShowTemplateSelector(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-panel rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col animate-slideUp">
+        {/* Header */}
+        <div className="p-6 border-b border-panel-border">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-accent-blue/10 rounded-lg">
+                  <Sparkles className="text-accent-blue" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Choose a Template</h2>
+                  <p className="text-sm text-white/60">Start with a professional layout or build from scratch</p>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowTemplateSelector(false)}
+              className="p-2 hover:bg-panel-light rounded-lg transition-colors"
+            >
+              <X size={20} className="text-white/70" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              type="text"
+              placeholder="Search templates..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-canvas border border-panel-border rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-accent-blue transition-colors"
+            />
+          </div>
+
+          {/* Categories */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            {TEMPLATE_CATEGORIES.map(category => {
+              const Icon = category.icon;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
+                    selectedCategory === category.id
+                      ? 'bg-accent-blue text-white shadow-lg'
+                      : 'bg-panel-light text-white/70 hover:bg-panel-lighter'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="text-sm font-medium">{category.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Templates Grid */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {filteredTemplates.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="text-6xl mb-4 opacity-20">🔍</div>
+              <p className="text-lg text-white/60">No templates found</p>
+              <p className="text-sm text-white/40 mt-2">Try adjusting your search or filters</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredTemplates.map((template) => {
+                const Icon = template.icon;
+                return (
+                  <button
+                    key={template.id}
+                    onClick={() => handleSelectTemplate(template)}
+                    className="group relative bg-panel-light rounded-xl overflow-hidden hover:bg-panel-lighter transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] text-left"
+                  >
+                    {/* Template Preview */}
+                    <div className="aspect-video bg-gradient-to-br from-accent-blue/20 to-purple-500/20 flex items-center justify-center border-b border-panel-border">
+                      <div className="text-6xl group-hover:scale-110 transition-transform duration-300">
+                        {template.thumbnail}
+                      </div>
+                    </div>
+
+                    {/* Template Info */}
+                    <div className="p-4">
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className="p-2 bg-accent-blue/10 rounded-lg group-hover:bg-accent-blue/20 transition-colors">
+                          <Icon size={20} className="text-accent-blue" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white mb-1 group-hover:text-accent-blue transition-colors">
+                            {template.name}
+                          </h3>
+                          <p className="text-sm text-white/60 line-clamp-2">
+                            {template.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      {template.widgets.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/5">
+                          <p className="text-xs text-white/40">
+                            {template.widgets.length} widget{template.widgets.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-accent-blue/0 group-hover:bg-accent-blue/5 transition-colors pointer-events-none" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-panel-border bg-canvas/50">
+          <p className="text-xs text-white/40 text-center">
+            You can customize any template after selection
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default TemplateSelector;

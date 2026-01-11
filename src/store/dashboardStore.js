@@ -1,4 +1,6 @@
+// src/store/dashboardStore.js
 import { create } from 'zustand';
+import GRID_CONFIG from '../config/gridConfig';
 
 const SIDEBAR_MIN_WIDTH = 200;
 const SIDEBAR_MAX_WIDTH = 400;
@@ -14,13 +16,14 @@ const useDashboardStore = create((set, get) => ({
   sidebarWidth: SIDEBAR_DEFAULT_WIDTH,
   propertyPanelOpen: false,
   propertyPanelWidth: PROPERTY_PANEL_DEFAULT_WIDTH,
+  showTemplateSelector: false,
   
   // Canvas State
   canvasZoom: 1,
   canvasPan: { x: 0, y: 0 },
   showGrid: true,
-  snapToGrid: false,
-  gridSize: 20,
+  gridColumns: GRID_CONFIG.columns,
+  currentBreakpoint: 'lg',
   
   // Widget State
   widgets: [],
@@ -32,6 +35,7 @@ const useDashboardStore = create((set, get) => ({
   isDragging: false,
   isResizing: false,
   isPanning: false,
+  draggedWidget: null,
   
   // History for Undo/Redo
   history: [],
@@ -56,10 +60,12 @@ const useDashboardStore = create((set, get) => ({
     propertyPanelWidth: Math.max(PROPERTY_PANEL_MIN_WIDTH, Math.min(PROPERTY_PANEL_MAX_WIDTH, width))
   }),
 
+  setShowTemplateSelector: (show) => set({ showTemplateSelector: show }),
+
   // === Canvas Actions ===
   
   setCanvasZoom: (zoom) => set({ 
-    canvasZoom: Math.max(0.1, Math.min(5, zoom))
+    canvasZoom: Math.max(0.5, Math.min(2, zoom))
   }),
   
   setCanvasPan: (pan) => set({ canvasPan: pan }),
@@ -70,8 +76,48 @@ const useDashboardStore = create((set, get) => ({
   }),
   
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
+
+  setCurrentBreakpoint: (breakpoint) => set({ currentBreakpoint: breakpoint }),
+
+  updateGridColumns: (columns) => set({ gridColumns: columns }),
+
+  // === Grid Collision Detection ===
   
-  toggleSnapToGrid: () => set((state) => ({ snapToGrid: !state.snapToGrid })),
+  checkCollision: (widget, excludeId = null) => {
+    const state = get();
+    const { x, y, w, h } = widget.gridArea;
+    
+    return state.widgets.some(w => {
+      if (w.id === excludeId) return false;
+      const area = w.gridArea;
+      
+      return !(
+        x >= area.x + area.w ||
+        area.x >= x + w ||
+        y >= area.y + area.h ||
+        area.y >= y + h
+      );
+    });
+  },
+
+  findEmptySpace: (width, height) => {
+    const state = get();
+    const maxColumns = state.gridColumns;
+    
+    // Try to find empty space row by row
+    for (let y = 0; y < 100; y++) {
+      for (let x = 0; x <= maxColumns - width; x++) {
+        const testWidget = { gridArea: { x, y, w: width, h: height } };
+        if (!state.checkCollision(testWidget)) {
+          return { x, y };
+        }
+      }
+    }
+    
+    // If no space found, place at bottom
+    const maxY = Math.max(...state.widgets.map(w => w.gridArea.y + w.gridArea.h), 0);
+    return { x: 0, y: maxY };
+  },
 
   // === Widget Selection ===
   
@@ -109,17 +155,25 @@ const useDashboardStore = create((set, get) => ({
   
   addWidget: (widgetType, widgetConfig = {}) => {
     const state = get();
+    
+    // Use provided grid area or find empty space
+    let gridArea = widgetConfig.gridArea;
+    if (!gridArea) {
+      const defaultWidth = Math.min(widgetType.minW || 4, state.gridColumns);
+      const defaultHeight = widgetType.minH || 2;
+      const position = state.findEmptySpace(defaultWidth, defaultHeight);
+      gridArea = { 
+        x: position.x, 
+        y: position.y, 
+        w: defaultWidth, 
+        h: defaultHeight 
+      };
+    }
+    
     const newWidget = {
       id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       type: widgetType.id,
-      position: widgetConfig.position || { 
-        x: 50 + state.widgets.length * 20, 
-        y: 50 + state.widgets.length * 20 
-      },
-      size: widgetConfig.size || { 
-        width: widgetType.defaultWidth || 400, 
-        height: widgetType.defaultHeight || 300 
-      },
+      gridArea,
       rotation: 0,
       locked: false,
       visible: true,
@@ -159,34 +213,37 @@ const useDashboardStore = create((set, get) => ({
     get().saveToLocalStorage();
   },
   
-  updateWidgetPosition: (widgetId, position) => {
+  updateWidgetGridArea: (widgetId, gridArea, checkCollision = true) => {
     const state = get();
-    let finalPosition = position;
-    
-    if (state.snapToGrid) {
-      finalPosition = {
-        x: Math.round(position.x / state.gridSize) * state.gridSize,
-        y: Math.round(position.y / state.gridSize) * state.gridSize,
-      };
+    const widget = state.widgets.find(w => w.id === widgetId);
+    if (!widget) return false;
+
+    // Ensure widget stays within grid bounds
+    const maxColumns = state.gridColumns;
+    const constrainedArea = {
+      x: Math.max(0, Math.min(gridArea.x, maxColumns - gridArea.w)),
+      y: Math.max(0, gridArea.y),
+      w: Math.max(GRID_CONFIG.minWidgetWidth, Math.min(gridArea.w, maxColumns)),
+      h: Math.max(GRID_CONFIG.minWidgetHeight, gridArea.h)
+    };
+
+    // Check collision if enabled
+    if (checkCollision) {
+      const testWidget = { gridArea: constrainedArea };
+      if (state.checkCollision(testWidget, widgetId)) {
+        return false;
+      }
     }
+
+    set((state) => ({
+      widgets: state.widgets.map((w) =>
+        w.id === widgetId 
+          ? { ...w, gridArea: constrainedArea }
+          : w
+      ),
+    }));
     
-    set((state) => ({
-      widgets: state.widgets.map((widget) =>
-        widget.id === widgetId 
-          ? { ...widget, position: finalPosition }
-          : widget
-      ),
-    }));
-  },
-  
-  updateWidgetSize: (widgetId, size) => {
-    set((state) => ({
-      widgets: state.widgets.map((widget) =>
-        widget.id === widgetId 
-          ? { ...widget, size }
-          : widget
-      ),
-    }));
+    return true;
   },
   
   deleteWidget: (widgetId) => {
@@ -216,12 +273,16 @@ const useDashboardStore = create((set, get) => ({
     const widget = state.widgets.find((w) => w.id === widgetId);
     if (!widget) return;
 
+    // Find empty space for duplicate
+    const position = state.findEmptySpace(widget.gridArea.w, widget.gridArea.h);
+
     const newWidget = {
       ...widget,
       id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      position: {
-        x: widget.position.x + 20,
-        y: widget.position.y + 20,
+      gridArea: {
+        ...widget.gridArea,
+        x: position.x,
+        y: position.y
       },
       zIndex: state.widgets.length,
       data: { ...widget.data },
@@ -259,6 +320,36 @@ const useDashboardStore = create((set, get) => ({
     get().saveToLocalStorage();
   },
 
+  // === Template Management ===
+  
+  loadTemplate: (template) => {
+    const state = get();
+    
+    // Clear existing widgets
+    set({ 
+      widgets: [],
+      selectedWidgetIds: [],
+      propertyPanelOpen: false 
+    });
+
+    // Add template widgets with proper IDs
+    const newWidgets = template.widgets.map((widgetConfig, index) => ({
+      id: `widget-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+      type: widgetConfig.type,
+      gridArea: widgetConfig.gridArea,
+      rotation: 0,
+      locked: false,
+      visible: true,
+      opacity: 1,
+      zIndex: index,
+      data: { ...widgetConfig.data },
+    }));
+
+    set({ widgets: newWidgets });
+    get().saveToHistory();
+    get().saveToLocalStorage();
+  },
+
   // === Clipboard Operations ===
   
   copySelectedWidgets: () => {
@@ -273,16 +364,22 @@ const useDashboardStore = create((set, get) => ({
     const state = get();
     if (!state.clipboard || state.clipboard.length === 0) return;
 
-    const newWidgets = state.clipboard.map((widget) => ({
-      ...widget,
-      id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      position: {
-        x: widget.position.x + 30,
-        y: widget.position.y + 30,
-      },
-      zIndex: state.widgets.length + state.clipboard.indexOf(widget),
-      data: { ...widget.data },
-    }));
+    const newWidgets = state.clipboard.map((widget) => {
+      // Find empty space
+      const position = state.findEmptySpace(widget.gridArea.w, widget.gridArea.h);
+      
+      return {
+        ...widget,
+        id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        gridArea: {
+          ...widget.gridArea,
+          x: position.x,
+          y: position.y
+        },
+        zIndex: state.widgets.length + state.clipboard.indexOf(widget),
+        data: { ...widget.data },
+      };
+    });
 
     set((state) => ({
       widgets: [...state.widgets, ...newWidgets],
@@ -325,7 +422,11 @@ const useDashboardStore = create((set, get) => ({
 
   // === Interaction State ===
   
-  setIsDragging: (isDragging) => set({ isDragging }),
+  setIsDragging: (isDragging, widgetId = null) => set({ 
+    isDragging,
+    draggedWidget: widgetId 
+  }),
+  
   setIsResizing: (isResizing) => set({ isResizing }),
   setIsPanning: (isPanning) => set({ isPanning }),
 
@@ -391,11 +492,12 @@ const useDashboardStore = create((set, get) => ({
         canvasZoom: state.canvasZoom,
         canvasPan: state.canvasPan,
         showGrid: state.showGrid,
-        snapToGrid: state.snapToGrid,
+        gridColumns: state.gridColumns,
         sidebarWidth: state.sidebarWidth,
         propertyPanelWidth: state.propertyPanelWidth,
+        version: '3.0.0',
       };
-      localStorage.setItem('figma-dashboard-v2', JSON.stringify(saveData));
+      localStorage.setItem('figma-dashboard-grid', JSON.stringify(saveData));
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
@@ -403,26 +505,37 @@ const useDashboardStore = create((set, get) => ({
   
   loadFromLocalStorage: () => {
     try {
-      const savedData = localStorage.getItem('figma-dashboard-v2');
+      const savedData = localStorage.getItem('figma-dashboard-grid');
       if (savedData) {
         const data = JSON.parse(savedData);
-        set({
-          widgets: data.widgets || [],
-          canvasZoom: data.canvasZoom || 1,
-          canvasPan: data.canvasPan || { x: 0, y: 0 },
-          showGrid: data.showGrid !== undefined ? data.showGrid : true,
-          snapToGrid: data.snapToGrid || false,
-          sidebarWidth: data.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
-          propertyPanelWidth: data.propertyPanelWidth || PROPERTY_PANEL_DEFAULT_WIDTH,
-        });
         
-        // Initialize history with loaded state
-        if (data.widgets && data.widgets.length > 0) {
-          get().saveToHistory();
+        // Check if it's the new grid format
+        if (data.version === '3.0.0' && data.widgets) {
+          set({
+            widgets: data.widgets || [],
+            canvasZoom: data.canvasZoom || 1,
+            canvasPan: data.canvasPan || { x: 0, y: 0 },
+            showGrid: data.showGrid !== undefined ? data.showGrid : true,
+            gridColumns: data.gridColumns || GRID_CONFIG.columns,
+            sidebarWidth: data.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
+            propertyPanelWidth: data.propertyPanelWidth || PROPERTY_PANEL_DEFAULT_WIDTH,
+          });
+          
+          // Initialize history with loaded state
+          if (data.widgets && data.widgets.length > 0) {
+            get().saveToHistory();
+          }
+        } else {
+          // Old format detected, show template selector
+          set({ showTemplateSelector: true });
         }
+      } else {
+        // No saved data, show template selector
+        set({ showTemplateSelector: true });
       }
     } catch (error) {
       console.error('Error loading from localStorage:', error);
+      set({ showTemplateSelector: true });
     }
   },
   
@@ -435,7 +548,7 @@ const useDashboardStore = create((set, get) => ({
       canvasZoom: 1,
       canvasPan: { x: 0, y: 0 },
     });
-    localStorage.removeItem('figma-dashboard-v2');
+    localStorage.removeItem('figma-dashboard-grid');
   },
   
   // === Export/Import ===
@@ -443,13 +556,12 @@ const useDashboardStore = create((set, get) => ({
   exportDashboard: () => {
     const state = get();
     return {
-      version: '2.0.0',
+      version: '3.0.0',
       timestamp: new Date().toISOString(),
       widgets: state.widgets,
       settings: {
         showGrid: state.showGrid,
-        snapToGrid: state.snapToGrid,
-        gridSize: state.gridSize,
+        gridColumns: state.gridColumns,
       },
     };
   },
@@ -463,8 +575,7 @@ const useDashboardStore = create((set, get) => ({
       widgets: data.widgets,
       selectedWidgetIds: [],
       showGrid: data.settings?.showGrid !== undefined ? data.settings.showGrid : true,
-      snapToGrid: data.settings?.snapToGrid || false,
-      gridSize: data.settings?.gridSize || 20,
+      gridColumns: data.settings?.gridColumns || GRID_CONFIG.columns,
     });
     
     get().saveToHistory();
