@@ -65,7 +65,7 @@ const useDashboardStore = create((set, get) => ({
   // === Canvas Actions ===
   
   setCanvasZoom: (zoom) => set({ 
-    canvasZoom: Math.max(0.5, Math.min(2, zoom))
+    canvasZoom: Math.max(0.25, Math.min(3, zoom))
   }),
   
   setCanvasPan: (pan) => set({ canvasPan: pan }),

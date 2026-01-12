@@ -192,8 +192,20 @@ const DashboardLayout = () => {
     input.click();
   };
 
-  const handleZoomIn = () => setCanvasZoom(Math.min(2, canvasZoom + 0.1));
-  const handleZoomOut = () => setCanvasZoom(Math.max(0.5, canvasZoom - 0.1));
+  const handleZoomIn = () => {
+    const newZoom = Math.min(3, canvasZoom + 0.25);
+    setCanvasZoom(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    const newZoom = Math.max(0.25, canvasZoom - 0.25);
+    setCanvasZoom(newZoom);
+  };
+
+  const handleResetZoom = () => {
+    setCanvasZoom(1);
+    resetCanvasView();
+  };
 
   const handleNewDashboard = () => {
     if (confirm('Create new dashboard? Current work will be saved.')) {
