@@ -1,21 +1,8 @@
-// src/components/Dashboard/DashboardLayout.jsx
+// src/components/Dashboard/DashboardLayout.jsx - FIXED VERSION
 import React, { useEffect, useState, useRef } from 'react';
 import { 
-  Menu, 
-  Save, 
-  Download, 
-  Upload, 
-  Trash2, 
-  Grid, 
-  ZoomIn, 
-  ZoomOut,
-  Maximize2,
-  Undo2,
-  Redo2,
-  Copy,
-  Clipboard,
-  Check,
-  Sparkles
+  Menu, Save, Download, Upload, Trash2, Grid, ZoomIn, ZoomOut,
+  Maximize2, Undo2, Redo2, Copy, Clipboard, Check, Sparkles, AlertCircle
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { usePersistentLayout } from '../../hooks/usePersistentLayout';
@@ -26,38 +13,23 @@ import TemplateSelector from '../Templates/TemplateSelector';
 
 const DashboardLayout = () => {
   const {
-    sidebarOpen,
-    sidebarWidth,
-    setSidebarWidth,
-    propertyPanelOpen,
-    propertyPanelWidth,
-    setPropertyPanelWidth,
-    toggleSidebar,
-    showGrid,
-    toggleGrid,
-    canvasZoom,
-    setCanvasZoom,
-    resetCanvasView,
-    clearDashboard,
-    saveToLocalStorage,
-    exportDashboard,
-    importDashboard,
-    undo,
-    redo,
-    historyIndex,
-    history,
-    copySelectedWidgets,
-    pasteWidgets,
-    selectedWidgetIds,
-    showTemplateSelector,
-    setShowTemplateSelector,
+    sidebarOpen, sidebarWidth, setSidebarWidth,
+    propertyPanelOpen, propertyPanelWidth, setPropertyPanelWidth,
+    toggleSidebar, showGrid, toggleGrid,
+    canvasZoom, setCanvasZoom, resetCanvasView,
+    clearDashboard, saveToLocalStorage, exportDashboard, importDashboard,
+    undo, redo, historyIndex, history,
+    copySelectedWidgets, pasteWidgets, selectedWidgetIds,
+    showTemplateSelector, setShowTemplateSelector,
   } = useDashboardStore();
 
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isResizingProperty, setIsResizingProperty] = useState(false);
   const [saveIndicator, setSaveIndicator] = useState(false);
+  const [error, setError] = useState(null);
   const sidebarDividerRef = useRef(null);
   const propertyDividerRef = useRef(null);
+  const saveTimeoutRef = useRef(null);
 
   usePersistentLayout();
 
@@ -113,38 +85,58 @@ const DashboardLayout = () => {
     };
   }, [isResizingProperty, setPropertyPanelWidth]);
 
-  // Keyboard shortcuts
+  // FIXED: Keyboard shortcuts with proper preventDefault
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
       
+      // Save
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
+        return;
       }
+      
+      // Undo
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
+        return;
       }
+      
+      // Redo
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
         e.preventDefault();
         redo();
+        return;
       }
+      
+      // Copy (only when not typing)
       if ((e.metaKey || e.ctrlKey) && e.key === 'c' && selectedWidgetIds.length > 0 && !isTyping) {
         e.preventDefault();
         copySelectedWidgets();
+        return;
       }
+      
+      // Paste (only when not typing)
       if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !isTyping) {
         e.preventDefault();
         pasteWidgets();
+        return;
       }
+      
+      // Delete (only when not typing)
       if (e.key === 'Delete' && selectedWidgetIds.length > 0 && !isTyping) {
         e.preventDefault();
         useDashboardStore.getState().deleteSelectedWidgets();
+        return;
       }
+      
+      // Toggle Grid
       if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
         e.preventDefault();
         toggleGrid();
+        return;
       }
     };
 
@@ -152,24 +144,54 @@ const DashboardLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, copySelectedWidgets, pasteWidgets, selectedWidgetIds, toggleGrid]);
 
-  // Save with indicator
+  // FIXED: Save with proper timeout cleanup
   const handleSave = () => {
-    saveToLocalStorage();
-    setSaveIndicator(true);
-    setTimeout(() => setSaveIndicator(false), 2000);
+    try {
+      saveToLocalStorage();
+      
+      // Clear previous timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      
+      setSaveIndicator(true);
+      saveTimeoutRef.current = setTimeout(() => {
+        setSaveIndicator(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Save error:', error);
+      setError('Failed to save dashboard');
+      setTimeout(() => setError(null), 3000);
+    }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleExport = () => {
-    const data = exportDashboard();
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `dashboard-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const data = exportDashboard();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `dashboard-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export error:', error);
+      setError('Failed to export dashboard');
+      setTimeout(() => setError(null), 3000);
+    }
   };
 
+  // FIXED: Import with detailed error handling
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -181,10 +203,27 @@ const DashboardLayout = () => {
         reader.onload = (e) => {
           try {
             const data = JSON.parse(e.target.result);
+            
+            // Validate data structure
+            if (!data.widgets || !Array.isArray(data.widgets)) {
+              throw new Error('Invalid dashboard format: missing widgets array');
+            }
+            
+            if (!data.version) {
+              throw new Error('Invalid dashboard format: missing version');
+            }
+            
             importDashboard(data);
+            setError(null);
           } catch (error) {
-            alert('Invalid dashboard file');
+            console.error('Import error:', error);
+            setError(`Import failed: ${error.message}`);
+            setTimeout(() => setError(null), 5000);
           }
+        };
+        reader.onerror = () => {
+          setError('Failed to read file');
+          setTimeout(() => setError(null), 3000);
         };
         reader.readAsText(file);
       }
@@ -202,11 +241,6 @@ const DashboardLayout = () => {
     setCanvasZoom(newZoom);
   };
 
-  const handleResetZoom = () => {
-    setCanvasZoom(1);
-    resetCanvasView();
-  };
-
   const handleNewDashboard = () => {
     if (confirm('Create new dashboard? Current work will be saved.')) {
       saveToLocalStorage();
@@ -217,184 +251,129 @@ const DashboardLayout = () => {
 
   return (
     <div className="flex flex-col h-screen bg-canvas text-white overflow-hidden">
-      {/* Template Selector Modal */}
       {showTemplateSelector && <TemplateSelector />}
 
-      {/* Top Toolbar */}
+      {/* Error Toast */}
+      {error && (
+        <div className="fixed top-4 right-4 z-[9999] bg-red-500/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slideIn">
+          <AlertCircle size={18} />
+          <span className="text-sm font-medium">{error}</span>
+        </div>
+      )}
+
       <header className="h-12 bg-panel border-b border-panel-border flex items-center justify-between px-3 no-print z-50">
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleSidebar}
-            className="p-1.5 hover:bg-panel-light rounded transition-colors"
-            title="Toggle Sidebar"
-          >
+          <button onClick={toggleSidebar}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Toggle Sidebar">
             <Menu size={18} />
           </button>
           
           <div className="w-px h-6 bg-panel-border mx-1" />
           
-          <button
-            onClick={handleNewDashboard}
-            className="px-3 py-1.5 hover:bg-panel-light rounded transition-colors flex items-center gap-2"
-            title="New Dashboard"
-            >
+          <button onClick={handleNewDashboard}
+            className="px-3 py-1.5 hover:bg-panel-light rounded transition-colors flex items-center gap-2" title="New Dashboard">
             <Sparkles size={16} />
             <span className="text-sm hidden sm:inline">New</span>
-           </button>
-           <div className="w-px h-6 bg-panel-border mx-1" />
-      
-      <button
-        onClick={undo}
-        disabled={historyIndex <= 0}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        title="Undo (Cmd+Z)"
-      >
-        <Undo2 size={18} />
-      </button>
-      <button
-        onClick={redo}
-        disabled={historyIndex >= history.length - 1}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        title="Redo (Cmd+Y)"
-      >
-        <Redo2 size={18} />
-      </button>
-      
-      <div className="w-px h-6 bg-panel-border mx-1" />
-      
-      <button
-        onClick={copySelectedWidgets}
-        disabled={selectedWidgetIds.length === 0}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30"
-        title="Copy (Cmd+C)"
-      >
-        <Copy size={18} />
-      </button>
-      <button
-        onClick={pasteWidgets}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Paste (Cmd+V)"
-      >
-        <Clipboard size={18} />
-      </button>
-    </div>
-
-    <div className="flex items-center gap-2">
-      <button
-        onClick={toggleGrid}
-        className={`p-1.5 rounded transition-colors ${
-          showGrid ? 'bg-accent-blue text-white' : 'hover:bg-panel-light'
-        }`}
-        title="Toggle Grid (Cmd+G)"
-      >
-        <Grid size={18} />
-      </button>
-      
-      <div className="w-px h-6 bg-panel-border mx-1" />
-      
-      <button
-        onClick={handleZoomOut}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Zoom Out"
-      >
-        <ZoomOut size={18} />
-      </button>
-      <span className="text-xs text-text-secondary w-12 text-center">
-        {Math.round(canvasZoom * 100)}%
-      </span>
-      <button
-        onClick={handleZoomIn}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Zoom In"
-      >
-        <ZoomIn size={18} />
-      </button>
-      <button
-        onClick={resetCanvasView}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Reset View"
-      >
-        <Maximize2 size={18} />
-      </button>
-      
-      <div className="w-px h-6 bg-panel-border mx-1" />
-      
-      <button
-        onClick={handleSave}
-        className={`px-3 py-1.5 rounded transition-all flex items-center gap-2 ${
-          saveIndicator 
-            ? 'bg-green-600 text-white' 
-            : 'hover:bg-panel-light'
-        }`}
-        title="Save (Cmd+S)"
-      >
-        {saveIndicator ? (
-          <>
-            <Check size={16} />
-            <span className="text-sm hidden sm:inline">Saved!</span>
-          </>
-        ) : (
-          <>
-            <Save size={16} />
-            <span className="text-sm hidden sm:inline">Save</span>
-          </>
-        )}
-      </button>
-      <button
-        onClick={handleExport}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Export JSON"
-      >
-        <Download size={18} />
-      </button>
-      <button
-        onClick={handleImport}
-        className="p-1.5 hover:bg-panel-light rounded transition-colors"
-        title="Import JSON"
-      >
-        <Upload size={18} />
-      </button>
-      <button
-        onClick={() => {
-          if (confirm('Clear entire dashboard? This cannot be undone.')) clearDashboard();
-        }}
-        className="p-1.5 hover:bg-red-600/20 text-red-400 rounded transition-colors"
-        title="Clear All"
-      >
-        <Trash2 size={18} />
-      </button>
-    </div>
-  </header>
-
-  {/* Main Layout */}
-  <div className="flex flex-1 overflow-hidden relative">
-    {/* Sidebar */}
-    {sidebarOpen && (
-      <>
-        <div style={{ width: sidebarWidth }} className="relative">
-          <WidgetSidebar />
+          </button>
+          
+          <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          <button onClick={undo} disabled={historyIndex <= 0}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Undo (Cmd+Z)">
+            <Undo2 size={18} />
+          </button>
+          <button onClick={redo} disabled={historyIndex >= history.length - 1}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            title="Redo (Cmd+Y)">
+            <Redo2 size={18} />
+          </button>
+          
+          <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          <button onClick={copySelectedWidgets} disabled={selectedWidgetIds.length === 0}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors disabled:opacity-30" title="Copy (Cmd+C)">
+            <Copy size={18} />
+          </button>
+          <button onClick={pasteWidgets}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Paste (Cmd+V)">
+            <Clipboard size={18} />
+          </button>
         </div>
-        <div
-          ref={sidebarDividerRef}
-          className="panel-divider"
-              onMouseDown={() => setIsResizingSidebar(true)}
-            />
+
+        <div className="flex items-center gap-2">
+          <button onClick={toggleGrid}
+            className={`p-1.5 rounded transition-colors ${showGrid ? 'bg-accent-blue text-white' : 'hover:bg-panel-light'}`}
+            title="Toggle Grid (Cmd+G)">
+            <Grid size={18} />
+          </button>
+          
+          <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          <button onClick={handleZoomOut}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Zoom Out">
+            <ZoomOut size={18} />
+          </button>
+          <span className="text-xs text-text-secondary w-12 text-center">
+            {Math.round(canvasZoom * 100)}%
+          </span>
+          <button onClick={handleZoomIn}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Zoom In">
+            <ZoomIn size={18} />
+          </button>
+          <button onClick={resetCanvasView}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Reset View">
+            <Maximize2 size={18} />
+          </button>
+          
+          <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          <button onClick={handleSave}
+            className={`px-3 py-1.5 rounded transition-all flex items-center gap-2 ${
+              saveIndicator ? 'bg-green-600 text-white' : 'hover:bg-panel-light'
+            }`} title="Save (Cmd+S)">
+            {saveIndicator ? (
+              <><Check size={16} /><span className="text-sm hidden sm:inline">Saved!</span></>
+            ) : (
+              <><Save size={16} /><span className="text-sm hidden sm:inline">Save</span></>
+            )}
+          </button>
+          <button onClick={handleExport}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Export JSON">
+            <Download size={18} />
+          </button>
+          <button onClick={handleImport}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Import JSON">
+            <Upload size={18} />
+          </button>
+          <button onClick={() => {
+            if (confirm('Clear entire dashboard? This cannot be undone.')) clearDashboard();
+          }}
+            className="p-1.5 hover:bg-red-600/20 text-red-400 rounded transition-colors" title="Clear All">
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden relative">
+        {sidebarOpen && (
+          <>
+            <div style={{ width: sidebarWidth }} className="relative">
+              <WidgetSidebar />
+            </div>
+            <div ref={sidebarDividerRef} className="panel-divider"
+              onMouseDown={() => setIsResizingSidebar(true)} />
           </>
         )}
 
-        {/* Canvas */}
         <div className="flex-1 relative overflow-hidden">
           <GridCanvas />
         </div>
 
-        {/* Property Panel */}
         {propertyPanelOpen && (
           <>
-            <div
-              ref={propertyDividerRef}
-              className="panel-divider"
-              onMouseDown={() => setIsResizingProperty(true)}
-            />
+            <div ref={propertyDividerRef} className="panel-divider"
+              onMouseDown={() => setIsResizingProperty(true)} />
             <div style={{ width: propertyPanelWidth }} className="relative">
               <PropertyPanel />
             </div>

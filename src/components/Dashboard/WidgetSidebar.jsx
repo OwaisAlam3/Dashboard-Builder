@@ -1,12 +1,21 @@
-import React, { useState, useMemo } from 'react';
+// src/components/Dashboard/WidgetSidebar.jsx - FIXED VERSION
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, X } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { WIDGET_TYPES } from '../../config/widgetRegistry';
 
 const WidgetSidebar = () => {
   const { addWidget, sidebarOpen, toggleSidebar } = useDashboardStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  
+  // FIXED: Persist search and category state
+  const searchStateRef = useRef({ searchTerm: '', selectedCategory: 'all' });
+  const [searchTerm, setSearchTerm] = useState(searchStateRef.current.searchTerm);
+  const [selectedCategory, setSelectedCategory] = useState(searchStateRef.current.selectedCategory);
+
+  // Update ref when state changes
+  useEffect(() => {
+    searchStateRef.current = { searchTerm, selectedCategory };
+  }, [searchTerm, selectedCategory]);
 
   const categories = useMemo(() => {
     const cats = new Set(['all']);
@@ -28,6 +37,14 @@ const WidgetSidebar = () => {
     addWidget(widgetType);
   };
 
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+  };
+
   if (!sidebarOpen) return null;
 
   return (
@@ -46,12 +63,12 @@ const WidgetSidebar = () => {
 
         {/* Search */}
         <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-2.5 text-white/40" />
+          <Search size={14} className="absolute left-2.5 top-2.5 text-white/40 pointer-events-none" />
           <input
             type="text"
             placeholder="Search widgets..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-8 pr-3 py-2 bg-canvas border border-panel-border rounded text-sm text-white placeholder-white/40 focus:outline-none focus:border-accent-blue transition-colors"
           />
         </div>
@@ -61,7 +78,7 @@ const WidgetSidebar = () => {
           {categories.map(category => (
             <button
               key={category}
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => handleCategoryChange(category)}
               className={`px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
                 selectedCategory === category
                   ? 'bg-accent-blue text-white'

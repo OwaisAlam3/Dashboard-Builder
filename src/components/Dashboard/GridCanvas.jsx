@@ -1,74 +1,66 @@
-// src/components/Dashboard/GridCanvas.jsx - COMPLETE REWRITE
+// src/components/Dashboard/GridCanvas.jsx - FIXED 1920x1080 Canvas
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useDashboardStore from '../../store/dashboardStore';
 import BaseWidget from '../Widgets/BaseWidget';
 import GRID_CONFIG from '../../config/gridConfig';
 
+// Fixed canvas dimensions - EXPORTED for use in other components
+export const CANVAS_WIDTH = 1366;
+export const CANVAS_HEIGHT = 768;
+
 const GridCanvas = () => {
   const canvasRef = useRef(null);
   const contentRef = useRef(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [containerHeight, setContainerHeight] = useState(0);
   
   const {
     widgets,
     canvasZoom,
     setCanvasZoom,
-    canvasPan,
-    setCanvasPan,
     showGrid,
     gridColumns,
     deselectAll,
     selectMultiple,
-    isPanning,
     setIsPanning,
     updateGridColumns,
     setCurrentBreakpoint,
+    propertyPanelOpen,
+    maxRows,
+    setMaxRows,
   } = useDashboardStore();
 
   const [isPanningLocal, setIsPanningLocal] = useState(false);
-  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 });
   const [selectionBox, setSelectionBox] = useState(null);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
-  // Update container dimensions and responsive breakpoints
+  // Initialize canvas dimensions and grid on mount
   useEffect(() => {
-    const updateDimensions = () => {
-      if (canvasRef.current) {
-        const width = canvasRef.current.offsetWidth;
-        const height = canvasRef.current.offsetHeight;
-        setContainerWidth(width);
-        setContainerHeight(height);
+    // Calculate max rows based on fixed canvas height
+    const calculatedMaxRows = GRID_CONFIG.getMaxRows(CANVAS_HEIGHT);
+    setMaxRows(calculatedMaxRows);
 
-        // Determine breakpoint
-        let breakpoint = 'xs';
-        let cols = GRID_CONFIG.breakpoints.xs.columns;
+    // Set grid columns based on canvas width
+    let breakpoint = 'lg'; // Default to large for 1920px
+    let cols = GRID_CONFIG.breakpoints.lg?.columns || 24;
 
-        Object.entries(GRID_CONFIG.breakpoints).forEach(([key, value]) => {
-          if (width >= value.minWidth) {
-            breakpoint = key;
-            cols = value.columns;
-          }
-        });
-
-        setCurrentBreakpoint(breakpoint);
-        updateGridColumns(cols);
+    // Determine breakpoint based on canvas width
+    Object.entries(GRID_CONFIG.breakpoints).forEach(([key, value]) => {
+      if (CANVAS_WIDTH >= value.minWidth) {
+        breakpoint = key;
+        cols = value.columns;
       }
-    };
+    });
 
-    updateDimensions();
-    const resizeObserver = new ResizeObserver(updateDimensions);
-    if (canvasRef.current) {
-      resizeObserver.observe(canvasRef.current);
-    }
-
-    return () => resizeObserver.disconnect();
-  }, [setCurrentBreakpoint, updateGridColumns]);
+    setCurrentBreakpoint(breakpoint);
+    updateGridColumns(cols);
+  }, [setCurrentBreakpoint, updateGridColumns, setMaxRows]);
 
   // Space key detection for panning
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.code === 'Space' && !e.repeat) {
+      if (e.code === 'Space' && !e.repeat && 
+          document.activeElement.tagName !== 'INPUT' && 
+          document.activeElement.tagName !== 'TEXTAREA') {
         e.preventDefault();
         setIsSpacePressed(true);
       }
@@ -94,19 +86,31 @@ const GridCanvas = () => {
   }, [isPanningLocal, setIsPanning]);
 
   // Pan handling
-  const handleCanvasMouseDown = (e) => {
-    const isCanvasClick = e.target === canvasRef.current || e.target === contentRef.current;
+  const handleCanvasMouseDown = useCallback((e) => {
+    const isCanvasClick = e.target === canvasRef.current || 
+                          e.target === contentRef.current || 
+                          e.target.classList.contains('grid-background') ||
+                          e.target.classList.contains('canvas-boundary');
 
     // Middle mouse button or Space + Left click for panning
     if (e.button === 1 || (e.button === 0 && isSpacePressed)) {
       e.preventDefault();
       setIsPanningLocal(true);
       setIsPanning(true);
-      setPanStart({ x: e.clientX - canvasPan.x, y: e.clientY - canvasPan.y });
+      setPanStart({ 
+        x: e.clientX, 
+        y: e.clientY,
+        scrollLeft: canvasRef.current.scrollLeft,
+        scrollTop: canvasRef.current.scrollTop
+      });
     } 
-    // Left click on canvas background for selection box
+    // Left click on canvas background for selection box or deselect
     else if (e.button === 0 && isCanvasClick && !isSpacePressed) {
-      deselectAll();
+      if (propertyPanelOpen) {
+        deselectAll();
+        return;
+      }
+      
       const rect = canvasRef.current.getBoundingClientRect();
       const scrollLeft = canvasRef.current.scrollLeft;
       const scrollTop = canvasRef.current.scrollTop;
@@ -116,21 +120,15 @@ const GridCanvas = () => {
       
       setSelectionBox({ startX, startY, endX: startX, endY: startY });
     }
-  };
+  }, [isSpacePressed, propertyPanelOpen, canvasZoom, deselectAll, setIsPanning]);
 
   const handleCanvasMouseMove = useCallback((e) => {
-    if (isPanningLocal) {
-      const newPanX = e.clientX - panStart.x;
-      const newPanY = e.clientY - panStart.y;
-      
-      // Smooth panning by directly scrolling the container
-      if (canvasRef.current) {
-        canvasRef.current.scrollLeft = -newPanX;
-        canvasRef.current.scrollTop = -newPanY;
-      }
-      
-      setCanvasPan({ x: newPanX, y: newPanY });
-    } else if (selectionBox) {
+    if (isPanningLocal && canvasRef.current) {
+      const deltaX = e.clientX - panStart.x;
+      const deltaY = e.clientY - panStart.y;
+      canvasRef.current.scrollLeft = panStart.scrollLeft - deltaX;
+      canvasRef.current.scrollTop = panStart.scrollTop - deltaY;
+    } else if (selectionBox && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
       const scrollLeft = canvasRef.current.scrollLeft;
       const scrollTop = canvasRef.current.scrollTop;
@@ -138,9 +136,9 @@ const GridCanvas = () => {
       const endX = (e.clientX - rect.left + scrollLeft) / canvasZoom;
       const endY = (e.clientY - rect.top + scrollTop) / canvasZoom;
       
-      setSelectionBox({ ...selectionBox, endX, endY });
+      setSelectionBox(prev => ({ ...prev, endX, endY }));
     }
-  }, [isPanningLocal, panStart, selectionBox, canvasZoom, setCanvasPan]);
+  }, [isPanningLocal, panStart, selectionBox, canvasZoom]);
 
   const handleCanvasMouseUp = useCallback(() => {
     if (isPanningLocal) {
@@ -148,40 +146,47 @@ const GridCanvas = () => {
       setIsPanning(false);
     }
     
-    if (selectionBox && containerWidth > 0) {
+    if (selectionBox) {
       const { startX, startY, endX, endY } = selectionBox;
-      const minX = Math.min(startX, endX);
-      const maxX = Math.max(startX, endX);
-      const minY = Math.min(startY, endY);
-      const maxY = Math.max(startY, endY);
-
-      const columnWidth = GRID_CONFIG.getPixelWidth(1, containerWidth / canvasZoom, gridColumns);
       
-      // Convert to grid coordinates
-      const minGridX = Math.floor(minX / (columnWidth + GRID_CONFIG.gap));
-      const maxGridX = Math.ceil(maxX / (columnWidth + GRID_CONFIG.gap));
-      const minGridY = Math.floor(minY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
-      const maxGridY = Math.ceil(maxY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
+      // Only process selection if there was actual movement
+      const minMovement = 5; // pixels
+      if (Math.abs(endX - startX) > minMovement || Math.abs(endY - startY) > minMovement) {
+        const minX = Math.min(startX, endX);
+        const maxX = Math.max(startX, endX);
+        const minY = Math.min(startY, endY);
+        const maxY = Math.max(startY, endY);
 
-      const selectedIds = widgets
-        .filter((widget) => {
-          const { x, y, w, h } = widget.gridArea;
-          return (
-            x < maxGridX &&
-            x + w > minGridX &&
-            y < maxGridY &&
-            y + h > minGridY
-          );
-        })
-        .map((w) => w.id);
+        const columnWidth = GRID_CONFIG.getPixelWidth(1, CANVAS_WIDTH, gridColumns);
+        
+        const minGridX = Math.floor(minX / (columnWidth + GRID_CONFIG.gap));
+        const maxGridX = Math.ceil(maxX / (columnWidth + GRID_CONFIG.gap));
+        const minGridY = Math.floor(minY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
+        const maxGridY = Math.ceil(maxY / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
 
-      if (selectedIds.length > 0) {
-        selectMultiple(selectedIds);
+        const selectedIds = widgets
+          .filter((widget) => {
+            const { x, y, w, h } = widget.gridArea;
+            return (
+              x < maxGridX &&
+              x + w > minGridX &&
+              y < maxGridY &&
+              y + h > minGridY
+            );
+          })
+          .map((w) => w.id);
+
+        if (selectedIds.length > 0) {
+          selectMultiple(selectedIds);
+        }
+      } else {
+        // Small movement, treat as click to deselect
+        deselectAll();
       }
       
       setSelectionBox(null);
     }
-  }, [isPanningLocal, selectionBox, widgets, setIsPanning, selectMultiple, containerWidth, gridColumns, canvasZoom]);
+  }, [isPanningLocal, selectionBox, widgets, setIsPanning, selectMultiple, deselectAll, gridColumns]);
 
   useEffect(() => {
     if (isPanningLocal || selectionBox) {
@@ -194,9 +199,9 @@ const GridCanvas = () => {
     }
   }, [isPanningLocal, selectionBox, handleCanvasMouseMove, handleCanvasMouseUp]);
 
-  // Improved zoom with mouse wheel - zoom towards cursor position
+  // Improved zoom with proper event handling
   const handleWheel = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey) {
+    if ((e.ctrlKey || e.metaKey) && canvasRef.current?.contains(e.target)) {
       e.preventDefault();
       e.stopPropagation();
       
@@ -207,7 +212,8 @@ const GridCanvas = () => {
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Math.max(0.25, Math.min(3, canvasZoom + delta));
       
-      // Calculate new scroll position to zoom towards cursor
+      if (newZoom === canvasZoom) return; // No change needed
+      
       const scrollLeft = canvasRef.current.scrollLeft;
       const scrollTop = canvasRef.current.scrollTop;
       
@@ -216,7 +222,6 @@ const GridCanvas = () => {
       
       setCanvasZoom(newZoom);
       
-      // Adjust scroll to maintain zoom point
       requestAnimationFrame(() => {
         if (canvasRef.current) {
           canvasRef.current.scrollLeft = zoomPointX * newZoom - mouseX;
@@ -226,35 +231,23 @@ const GridCanvas = () => {
     }
   }, [canvasZoom, setCanvasZoom]);
 
-  // Prevent default browser zoom
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
     const preventZoom = (e) => {
-      if (e.ctrlKey || e.metaKey) {
+      if ((e.ctrlKey || e.metaKey) && canvas.contains(e.target)) {
         e.preventDefault();
       }
     };
     
-    document.addEventListener('wheel', preventZoom, { passive: false });
-    return () => document.removeEventListener('wheel', preventZoom);
+    canvas.addEventListener('wheel', preventZoom, { passive: false });
+    return () => canvas.removeEventListener('wheel', preventZoom);
   }, []);
 
-  // Calculate grid dimensions
-  const scaledContainerWidth = containerWidth / canvasZoom;
-  const columnWidth = scaledContainerWidth > 0 
-    ? GRID_CONFIG.getPixelWidth(1, scaledContainerWidth, gridColumns) 
-    : 100;
-  
-  const maxRow = Math.max(...widgets.map(w => w.gridArea.y + w.gridArea.h), 8);
-  const contentWidth = Math.max(
-    scaledContainerWidth,
-    gridColumns * (columnWidth + GRID_CONFIG.gap) + GRID_CONFIG.containerPadding * 2
-  );
-  const contentHeight = Math.max(
-    containerHeight / canvasZoom,
-    GRID_CONFIG.getPixelHeight(maxRow) + GRID_CONFIG.containerPadding * 2
-  );
+  // Calculate grid dimensions based on fixed canvas
+  const columnWidth = GRID_CONFIG.getPixelWidth(1, CANVAS_WIDTH, gridColumns);
 
-  // Cursor style
   const getCursorStyle = () => {
     if (isPanningLocal) return 'grabbing';
     if (isSpacePressed) return 'grab';
@@ -267,120 +260,120 @@ const GridCanvas = () => {
       className="w-full h-full overflow-auto relative bg-canvas"
       onMouseDown={handleCanvasMouseDown}
       onWheel={handleWheel}
-      style={{
-        cursor: getCursorStyle(),
-      }}
+      style={{ cursor: getCursorStyle() }}
     >
-      {/* Zoomed Content Container */}
-      <div
-        ref={contentRef}
-        className="origin-top-left"
+      <div 
+        className="flex items-center justify-center min-w-full min-h-full p-8"
         style={{
-          width: contentWidth * canvasZoom,
-          height: contentHeight * canvasZoom,
-          minWidth: '100%',
-          minHeight: '100%',
-          transform: `scale(${canvasZoom})`,
-          transformOrigin: '0 0',
+          width: CANVAS_WIDTH * canvasZoom + 64,
+          height: CANVAS_HEIGHT * canvasZoom + 64,
         }}
       >
         <div
-          className="relative"
+          ref={contentRef}
+          className="origin-center relative canvas-boundary"
           style={{
-            width: contentWidth,
-            height: contentHeight,
-            padding: GRID_CONFIG.containerPadding,
+            width: CANVAS_WIDTH,
+            height: CANVAS_HEIGHT,
+            transform: `scale(${canvasZoom})`,
+            transformOrigin: 'center center',
+            backgroundColor: '#434446',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          {/* Grid Background */}
-          {showGrid && scaledContainerWidth > 0 && (
-            <div className="absolute inset-0 pointer-events-none" style={{ padding: GRID_CONFIG.containerPadding }}>
-              {/* Vertical grid lines */}
-              {Array.from({ length: gridColumns + 1 }).map((_, i) => (
-                <div
-                  key={`v-${i}`}
-                  className="absolute top-0 bottom-0 border-l"
-                  style={{
-                    left: i * (columnWidth + GRID_CONFIG.gap),
-                    borderColor: i % 3 === 0 ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-                  }}
-                />
-              ))}
-              
-              {/* Horizontal grid lines */}
-              {Array.from({ length: maxRow + 1 }).map((_, i) => (
-                <div
-                  key={`h-${i}`}
-                  className="absolute left-0 right-0 border-t"
-                  style={{
-                    top: i * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap),
-                    borderColor: i % 2 === 0 ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.04)',
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          <div className="relative w-full h-full" style={{
+            padding: GRID_CONFIG.containerPadding,
+          }}>
+            {/* Grid Lines */}
+            {showGrid && (
+              <div className="absolute inset-0 pointer-events-none" style={{ padding: GRID_CONFIG.containerPadding }}>
+                {/* Vertical lines */}
+                {Array.from({ length: gridColumns + 1 }).map((_, i) => (
+                  <div key={`v-${i}`} className="absolute top-0 bottom-0 border-l"
+                    style={{
+                      left: i * (columnWidth + GRID_CONFIG.gap),
+                      borderColor: i % 4 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                      borderWidth: '1px',
+                    }}
+                  />
+                ))}
+                {/* Horizontal lines */}
+                {Array.from({ length: maxRows + 1 }).map((_, i) => (
+                  <div key={`h-${i}`} className="absolute left-0 right-0 border-t"
+                    style={{
+                      top: i * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap),
+                      borderColor: i % 3 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                      borderWidth: '1px',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
 
-          {/* Widgets */}
-          {scaledContainerWidth > 0 && widgets
-            .filter((w) => w.visible)
-            .sort((a, b) => a.zIndex - b.zIndex)
-            .map((widget) => (
-              <BaseWidget 
-                key={widget.id} 
-                widget={widget} 
-                containerWidth={scaledContainerWidth}
-                gridColumns={gridColumns}
-                canvasZoom={canvasZoom}
+            {/* Widgets */}
+            {widgets
+              .filter((w) => w.visible)
+              .sort((a, b) => a.zIndex - b.zIndex)
+              .map((widget) => (
+                <BaseWidget 
+                  key={widget.id} 
+                  widget={widget} 
+                  containerWidth={CANVAS_WIDTH}
+                  gridColumns={gridColumns}
+                  canvasZoom={canvasZoom}
+                />
+              ))}
+
+            {/* Selection Box */}
+            {selectionBox && (
+              <div className="absolute border-2 border-accent-blue bg-accent-blue/10 pointer-events-none z-[9999] rounded"
+                style={{
+                  left: Math.min(selectionBox.startX, selectionBox.endX),
+                  top: Math.min(selectionBox.startY, selectionBox.endY),
+                  width: Math.abs(selectionBox.endX - selectionBox.startX),
+                  height: Math.abs(selectionBox.endY - selectionBox.startY),
+                }}
               />
-            ))}
+            )}
+          </div>
 
-          {/* Selection Box */}
-          {selectionBox && (
-            <div
-              className="absolute border-2 border-accent-blue bg-accent-blue/10 pointer-events-none z-[9999] rounded"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.endX),
-                top: Math.min(selectionBox.startY, selectionBox.endY),
-                width: Math.abs(selectionBox.endX - selectionBox.startX),
-                height: Math.abs(selectionBox.endY - selectionBox.startY),
-              }}
-            />
-          )}
+          {/* Canvas Info Overlay */}
+          <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs text-white/90 pointer-events-none">
+            16:9 Canvas • {CANVAS_WIDTH} × {CANVAS_HEIGHT}px
+          </div>
         </div>
       </div>
 
       {/* Empty State */}
       {widgets.length === 0 && (
-        <div 
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ transform: `scale(${canvasZoom})`, transformOrigin: 'center' }}
-        >
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center animate-fadeIn">
             <div className="text-6xl mb-4 opacity-20">✨</div>
-            <h3 className="text-xl font-semibold text-white/80 mb-2">
-              Your canvas awaits
-            </h3>
-            <p className="text-sm text-white/50">
-              Add widgets from the sidebar to get started
-            </p>
-            <p className="text-xs text-white/30 mt-4">
-              Hold <kbd className="px-2 py-1 bg-white/10 rounded">Space</kbd> to pan • 
-              <kbd className="px-2 py-1 bg-white/10 rounded ml-2">Ctrl + Scroll</kbd> to zoom
-            </p>
+            <h3 className="text-xl font-semibold text-white/80 mb-2">Your Full HD canvas awaits</h3>
+            <p className="text-sm text-white/50 mb-4">Add widgets from the sidebar to get started</p>
+            <div className="text-xs text-white/40">
+              Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}px ({gridColumns} columns × {maxRows} rows)
+            </div>
           </div>
         </div>
       )}
 
       {/* Zoom Indicator */}
-      <div className="absolute bottom-4 right-4 px-3 py-2 bg-panel/90 backdrop-blur-sm rounded-lg border border-panel-border text-xs text-white/70 pointer-events-none z-50">
-        {Math.round(canvasZoom * 100)}%
+      <div className="absolute bottom-4 right-4 px-3 py-2 bg-panel/95 backdrop-blur-sm rounded-lg border border-panel-border text-xs text-white/70 pointer-events-none z-50 shadow-lg">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-accent-blue rounded-full animate-pulse" />
+          {Math.round(canvasZoom * 100)}%
+        </div>
       </div>
 
       {/* Grid Info */}
       {showGrid && (
-        <div className="absolute bottom-4 left-4 px-3 py-2 bg-panel/90 backdrop-blur-sm rounded-lg border border-panel-border text-xs text-white/70 pointer-events-none z-50">
-          {gridColumns} columns • {GRID_CONFIG.rowHeight}px rows
+        <div className="absolute bottom-4 left-4 px-3 py-2 bg-panel/95 backdrop-blur-sm rounded-lg border border-panel-border text-xs text-white/70 pointer-events-none z-50 shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full" />
+            {gridColumns} cols × {maxRows} rows
+          </div>
         </div>
       )}
     </div>

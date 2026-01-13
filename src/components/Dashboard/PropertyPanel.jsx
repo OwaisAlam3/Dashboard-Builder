@@ -1,4 +1,4 @@
-// src/components/Dashboard/PropertyPanel.jsx
+// src/components/Dashboard/PropertyPanel.jsx - FIXED UX Issues
 import React, { useMemo, useCallback } from 'react';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
@@ -15,6 +15,7 @@ const PropertyPanel = () => {
     updateWidgetGridArea,
     propertyPanelOpen,
     gridColumns,
+    maxRows,
   } = useDashboardStore();
 
   const [expandedSections, setExpandedSections] = React.useState({
@@ -38,12 +39,12 @@ const PropertyPanel = () => {
     return null;
   }, [selectedWidget]);
 
-  const toggleSection = (section) => {
+  const toggleSection = useCallback((section) => {
     setExpandedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
-  };
+  }, []);
 
   const handleDataChange = useCallback((key, value) => {
     if (selectedWidget) {
@@ -53,29 +54,41 @@ const PropertyPanel = () => {
 
   const handleGridChange = useCallback((axis, value) => {
     if (selectedWidget) {
-      const newGridArea = {
-        ...selectedWidget.gridArea,
-        [axis]: Math.max(0, parseInt(value) || 0)
-      };
+      const numValue = Math.max(0, parseInt(value) || 0);
+      const newGridArea = { ...selectedWidget.gridArea };
       
-      // Constrain within bounds
-      if (axis === 'x') {
-        newGridArea.x = Math.min(newGridArea.x, gridColumns - newGridArea.w);
-      }
-      if (axis === 'w') {
-        newGridArea.w = Math.max(GRID_CONFIG.minWidgetWidth, Math.min(parseInt(value) || 1, gridColumns - newGridArea.x));
-      }
-      if (axis === 'h') {
-        newGridArea.h = Math.max(GRID_CONFIG.minWidgetHeight, parseInt(value) || 1);
+      // Apply constraints based on axis
+      switch (axis) {
+        case 'x':
+          newGridArea.x = Math.min(numValue, gridColumns - newGridArea.w);
+          break;
+        case 'y':
+          newGridArea.y = Math.min(numValue, maxRows - newGridArea.h);
+          break;
+        case 'w':
+          newGridArea.w = Math.max(
+            GRID_CONFIG.minWidgetWidth, 
+            Math.min(numValue, gridColumns - newGridArea.x)
+          );
+          break;
+        case 'h':
+          newGridArea.h = Math.max(
+            GRID_CONFIG.minWidgetHeight, 
+            Math.min(numValue, maxRows - newGridArea.y)
+          );
+          break;
+        default:
+          break;
       }
       
       updateWidgetGridArea(selectedWidget.id, newGridArea, true);
     }
-  }, [selectedWidget, updateWidgetGridArea, gridColumns]);
+  }, [selectedWidget, updateWidgetGridArea, gridColumns, maxRows]);
 
-  const stopPropagation = (e) => {
+  // Only stop propagation on mousedown to prevent canvas interactions
+  const stopPropagation = useCallback((e) => {
     e.stopPropagation();
-  };
+  }, []);
 
   if (!propertyPanelOpen || !selectedWidget) return null;
 
@@ -92,38 +105,42 @@ const PropertyPanel = () => {
         }
       </button>
       {expandedSections[section] && (
-        <div className="px-3 pb-3 space-y-3" onMouseDown={stopPropagation} onKeyDown={stopPropagation}>
+        <div className="px-3 pb-3 space-y-3">
           {children}
         </div>
       )}
     </div>
   );
 
-  const Input = ({ label, value, onChange, type = "number", min, max, step = 1, suffix = '' }) => (
-    <div>
-      <label className="block text-xs font-medium text-white/70 mb-1.5">
-        {label}
-      </label>
-      <div className="relative">
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onMouseDown={stopPropagation}
-          onKeyDown={stopPropagation}
-          min={min}
-          max={max}
-          step={step}
-          className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors"
-        />
-        {suffix && (
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-white/40">
-            {suffix}
-          </span>
+  const Input = ({ label, value, onChange, type = "number", min, max, step = 1, suffix = '', helperText = '' }) => {
+    return (
+      <div>
+        <label className="block text-xs font-medium text-white/70 mb-1.5">
+          {label}
+        </label>
+        <div className="relative">
+          <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onMouseDown={stopPropagation}
+            min={min}
+            max={max}
+            step={step}
+            className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50 transition-colors"
+          />
+          {suffix && (
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-white/40 pointer-events-none">
+              {suffix}
+            </span>
+          )}
+        </div>
+        {helperText && (
+          <p className="mt-1 text-xs text-white/40">{helperText}</p>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const ColorInput = ({ label, value, onChange }) => (
     <div>
@@ -143,8 +160,8 @@ const PropertyPanel = () => {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onMouseDown={stopPropagation}
-          onKeyDown={stopPropagation}
-          className="flex-1 px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors"
+          placeholder="#000000"
+          className="flex-1 px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50 transition-colors"
         />
       </div>
     </div>
@@ -159,7 +176,7 @@ const PropertyPanel = () => {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onMouseDown={stopPropagation}
-        className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors"
+        className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50 transition-colors cursor-pointer"
       >
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>
@@ -170,29 +187,31 @@ const PropertyPanel = () => {
     </div>
   );
 
-  const Textarea = ({ label, value, onChange, rows = 4 }) => (
-    <div>
-      <label className="block text-xs font-medium text-white/70 mb-1.5">
-        {label}
-      </label>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onMouseDown={stopPropagation}
-        onKeyDown={stopPropagation}
-        rows={rows}
-        className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue transition-colors resize-none"
-      />
-    </div>
-  );
+  const Textarea = ({ label, value, onChange, rows = 4 }) => {
+    return (
+      <div>
+        <label className="block text-xs font-medium text-white/70 mb-1.5">
+          {label}
+        </label>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onMouseDown={stopPropagation}
+          rows={rows}
+          className="w-full px-2.5 py-1.5 bg-canvas border border-panel-border rounded text-sm text-white focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/50 transition-colors resize-none"
+        />
+      </div>
+    );
+  };
 
   const Checkbox = ({ label, checked, onChange }) => (
-    <label className="flex items-center gap-2 cursor-pointer" onMouseDown={stopPropagation}>
+    <label className="flex items-center gap-2 cursor-pointer">
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4 rounded border-panel-border bg-canvas checked:bg-accent-blue focus:ring-2 focus:ring-accent-blue/50"
+        onMouseDown={stopPropagation}
+        className="w-4 h-4 rounded border-panel-border bg-canvas text-accent-blue focus:ring-2 focus:ring-accent-blue/50 cursor-pointer"
       />
       <span className="text-sm text-white/80">{label}</span>
     </label>
@@ -216,6 +235,7 @@ const PropertyPanel = () => {
           <button
             onClick={deselectAll}
             className="p-1 hover:bg-panel-light rounded transition-colors"
+            title="Close Properties"
           >
             <X size={16} className="text-white/70" />
           </button>
@@ -233,12 +253,15 @@ const PropertyPanel = () => {
               onChange={(val) => handleGridChange('x', val)}
               min={0}
               max={gridColumns - selectedWidget.gridArea.w}
+              helperText={`Max: ${gridColumns - selectedWidget.gridArea.w}`}
             />
             <Input
               label="Row (Y)"
               value={selectedWidget.gridArea.y}
               onChange={(val) => handleGridChange('y', val)}
               min={0}
+              max={maxRows - selectedWidget.gridArea.h}
+              helperText={`Max: ${maxRows - selectedWidget.gridArea.h}`}
             />
           </div>
         </Section>
@@ -246,19 +269,22 @@ const PropertyPanel = () => {
         <Section title="Grid Size" section="size">
           <div className="grid grid-cols-2 gap-2">
             <Input
-              label="Width (Columns)"
+              label="Width"
               value={selectedWidget.gridArea.w}
               onChange={(val) => handleGridChange('w', val)}
               min={GRID_CONFIG.minWidgetWidth}
               max={gridColumns}
               suffix="cols"
+              helperText={`${GRID_CONFIG.minWidgetWidth}-${gridColumns}`}
             />
             <Input
-              label="Height (Rows)"
+              label="Height"
               value={selectedWidget.gridArea.h}
               onChange={(val) => handleGridChange('h', val)}
               min={GRID_CONFIG.minWidgetHeight}
+              max={maxRows - selectedWidget.gridArea.y}
               suffix="rows"
+              helperText={`${GRID_CONFIG.minWidgetHeight}-${maxRows - selectedWidget.gridArea.y}`}
             />
           </div>
           <Input
