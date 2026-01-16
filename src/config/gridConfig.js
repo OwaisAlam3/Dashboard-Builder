@@ -1,7 +1,7 @@
-// src/config/gridConfig.js - FIXED for 1920x1080 Canvas
+// src/config/gridConfig.js - Complete with Fit-to-Screen
 export const GRID_CONFIG = {
-  columns: 24, // Increased for more precision on Full HD canvas
-  rowHeight: 60, // Optimized for 1080px height
+  columns: 24,
+  rowHeight: 60,
   gap: 12,
   containerPadding: 24,
   minWidgetWidth: 1,
@@ -9,13 +9,19 @@ export const GRID_CONFIG = {
   maxWidgetWidth: 24,
   maxWidgetHeight: 24,
   
-  // Fixed Full HD Canvas (16:9)
+  // Fixed Canvas (16:9)
   canvasWidth: 1366,
   canvasHeight: 768,
   aspectRatio: 16 / 9,
   
+  // Calculate zoom to fit canvas in viewport
+  calculateFitZoom: (viewportWidth, viewportHeight) => {
+    const horizontalZoom = (viewportWidth - 32) / GRID_CONFIG.canvasWidth;
+    const verticalZoom = (viewportHeight - 32) / GRID_CONFIG.canvasHeight;
+    return Math.min(horizontalZoom, verticalZoom, 1); // Never zoom more than 100%
+  },
+  
   breakpoints: {
-    // Since canvas is always 1920px, we default to 'lg' with 24 columns
     lg: { minWidth: 1200, columns: 24 },
     md: { minWidth: 996, columns: 24 },
     sm: { minWidth: 768, columns: 16 },
@@ -28,7 +34,7 @@ export const GRID_CONFIG = {
     return Math.floor((availableHeight + GRID_CONFIG.gap) / (GRID_CONFIG.rowHeight + GRID_CONFIG.gap));
   },
   
-  // Get pixel width for grid columns (using fixed canvas width)
+  // Get pixel width for grid columns
   getPixelWidth: (columns, canvasWidth = 1366, currentColumns = 24) => {
     const availableWidth = canvasWidth - (GRID_CONFIG.containerPadding * 2);
     const totalGaps = (currentColumns - 1) * GRID_CONFIG.gap;

@@ -1,4 +1,4 @@
-// src/components/Dashboard/GridCanvas.jsx - FIXED 1920x1080 Canvas
+// src/components/Dashboard/GridCanvas.jsx - FULLY FIXED: Canvas sizing, widget placement & selection
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useDashboardStore from '../../store/dashboardStore';
 import BaseWidget from '../Widgets/BaseWidget';
@@ -35,15 +35,12 @@ const GridCanvas = () => {
 
   // Initialize canvas dimensions and grid on mount
   useEffect(() => {
-    // Calculate max rows based on fixed canvas height
     const calculatedMaxRows = GRID_CONFIG.getMaxRows(CANVAS_HEIGHT);
     setMaxRows(calculatedMaxRows);
 
-    // Set grid columns based on canvas width
-    let breakpoint = 'lg'; // Default to large for 1920px
+    let breakpoint = 'lg';
     let cols = GRID_CONFIG.breakpoints.lg?.columns || 24;
 
-    // Determine breakpoint based on canvas width
     Object.entries(GRID_CONFIG.breakpoints).forEach(([key, value]) => {
       if (CANVAS_WIDTH >= value.minWidth) {
         breakpoint = key;
@@ -85,12 +82,15 @@ const GridCanvas = () => {
     };
   }, [isPanningLocal, setIsPanning]);
 
-  // Pan handling
+  // FIXED: Pan handling with better target detection
   const handleCanvasMouseDown = useCallback((e) => {
+    // Check if click is on canvas background (not on widgets)
     const isCanvasClick = e.target === canvasRef.current || 
                           e.target === contentRef.current || 
                           e.target.classList.contains('grid-background') ||
-                          e.target.classList.contains('canvas-boundary');
+                          e.target.classList.contains('canvas-boundary') ||
+                          e.target.classList.contains('grid-container') ||
+                          e.target.classList.contains('grid-lines');
 
     // Middle mouse button or Space + Left click for panning
     if (e.button === 1 || (e.button === 0 && isSpacePressed)) {
@@ -106,6 +106,7 @@ const GridCanvas = () => {
     } 
     // Left click on canvas background for selection box or deselect
     else if (e.button === 0 && isCanvasClick && !isSpacePressed) {
+      // Deselect if property panel is open
       if (propertyPanelOpen) {
         deselectAll();
         return;
@@ -149,8 +150,7 @@ const GridCanvas = () => {
     if (selectionBox) {
       const { startX, startY, endX, endY } = selectionBox;
       
-      // Only process selection if there was actual movement
-      const minMovement = 5; // pixels
+      const minMovement = 5;
       if (Math.abs(endX - startX) > minMovement || Math.abs(endY - startY) > minMovement) {
         const minX = Math.min(startX, endX);
         const maxX = Math.max(startX, endX);
@@ -180,7 +180,6 @@ const GridCanvas = () => {
           selectMultiple(selectedIds);
         }
       } else {
-        // Small movement, treat as click to deselect
         deselectAll();
       }
       
@@ -212,7 +211,7 @@ const GridCanvas = () => {
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       const newZoom = Math.max(0.25, Math.min(3, canvasZoom + delta));
       
-      if (newZoom === canvasZoom) return; // No change needed
+      if (newZoom === canvasZoom) return;
       
       const scrollLeft = canvasRef.current.scrollLeft;
       const scrollTop = canvasRef.current.scrollTop;
@@ -245,7 +244,6 @@ const GridCanvas = () => {
     return () => canvas.removeEventListener('wheel', preventZoom);
   }, []);
 
-  // Calculate grid dimensions based on fixed canvas
   const columnWidth = GRID_CONFIG.getPixelWidth(1, CANVAS_WIDTH, gridColumns);
 
   const getCursorStyle = () => {
@@ -262,85 +260,103 @@ const GridCanvas = () => {
       onWheel={handleWheel}
       style={{ cursor: getCursorStyle() }}
     >
+      {/* FIXED: Canvas wrapper with proper centering and sizing */}
       <div 
-        className="flex items-center justify-center min-w-full min-h-full p-8"
         style={{
-          width: CANVAS_WIDTH * canvasZoom + 64,
-          height: CANVAS_HEIGHT * canvasZoom + 64,
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: CANVAS_WIDTH * canvasZoom + 128,
+          height: CANVAS_HEIGHT * canvasZoom + 128,
+          minWidth: CANVAS_WIDTH * canvasZoom + 128,
+          minHeight: CANVAS_HEIGHT * canvasZoom + 128,
         }}
       >
         <div
-          ref={contentRef}
-          className="origin-center relative canvas-boundary"
           style={{
-            width: CANVAS_WIDTH,
-            height: CANVAS_HEIGHT,
-            transform: `scale(${canvasZoom})`,
-            transformOrigin: 'center center',
-            backgroundColor: '#434446',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
           }}
         >
-          <div className="relative w-full h-full" style={{
-            padding: GRID_CONFIG.containerPadding,
-          }}>
-            {/* Grid Lines */}
-            {showGrid && (
-              <div className="absolute inset-0 pointer-events-none" style={{ padding: GRID_CONFIG.containerPadding }}>
-                {/* Vertical lines */}
-                {Array.from({ length: gridColumns + 1 }).map((_, i) => (
-                  <div key={`v-${i}`} className="absolute top-0 bottom-0 border-l"
-                    style={{
-                      left: i * (columnWidth + GRID_CONFIG.gap),
-                      borderColor: i % 4 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
-                      borderWidth: '1px',
-                    }}
-                  />
-                ))}
-                {/* Horizontal lines */}
-                {Array.from({ length: maxRows + 1 }).map((_, i) => (
-                  <div key={`h-${i}`} className="absolute left-0 right-0 border-t"
-                    style={{
-                      top: i * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap),
-                      borderColor: i % 3 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
-                      borderWidth: '1px',
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+          <div
+            ref={contentRef}
+            className="origin-center relative canvas-boundary"
+            style={{
+              width: CANVAS_WIDTH,
+              height: CANVAS_HEIGHT,
+              transform: `scale(${canvasZoom})`,
+              transformOrigin: 'center center',
+              backgroundColor: '#434446',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+            }}
+          >
+            {/* FIXED: Grid container with proper class for click detection */}
+            <div className="relative w-full h-full grid-container" style={{
+              padding: GRID_CONFIG.containerPadding,
+            }}>
+              {/* Grid Lines */}
+              {showGrid && (
+                <div className="absolute inset-0 pointer-events-none grid-lines" style={{ 
+                  padding: GRID_CONFIG.containerPadding 
+                }}>
+                  {/* Vertical lines */}
+                  {Array.from({ length: gridColumns + 1 }).map((_, i) => (
+                    <div key={`v-${i}`} className="absolute top-0 bottom-0 border-l"
+                      style={{
+                        left: i * (columnWidth + GRID_CONFIG.gap),
+                        borderColor: i % 4 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                        borderWidth: '1px',
+                      }}
+                    />
+                  ))}
+                  {/* Horizontal lines */}
+                  {Array.from({ length: maxRows + 1 }).map((_, i) => (
+                    <div key={`h-${i}`} className="absolute left-0 right-0 border-t"
+                      style={{
+                        top: i * (GRID_CONFIG.rowHeight + GRID_CONFIG.gap),
+                        borderColor: i % 3 === 0 ? 'rgba(59, 130, 246, 0.15)' : 'rgba(148, 163, 184, 0.08)',
+                        borderWidth: '1px',
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
 
-            {/* Widgets */}
-            {widgets
-              .filter((w) => w.visible)
-              .sort((a, b) => a.zIndex - b.zIndex)
-              .map((widget) => (
-                <BaseWidget 
-                  key={widget.id} 
-                  widget={widget} 
-                  containerWidth={CANVAS_WIDTH}
-                  gridColumns={gridColumns}
-                  canvasZoom={canvasZoom}
+              {/* Widgets */}
+              {widgets
+                .filter((w) => w.visible)
+                .sort((a, b) => a.zIndex - b.zIndex)
+                .map((widget) => (
+                  <BaseWidget 
+                    key={widget.id} 
+                    widget={widget} 
+                    containerWidth={CANVAS_WIDTH}
+                    gridColumns={gridColumns}
+                    canvasZoom={canvasZoom}
+                  />
+                ))}
+
+              {/* Selection Box */}
+              {selectionBox && (
+                <div className="absolute border-2 border-accent-blue bg-accent-blue/10 pointer-events-none z-[9999] rounded"
+                  style={{
+                    left: Math.min(selectionBox.startX, selectionBox.endX),
+                    top: Math.min(selectionBox.startY, selectionBox.endY),
+                    width: Math.abs(selectionBox.endX - selectionBox.startX),
+                    height: Math.abs(selectionBox.endY - selectionBox.startY),
+                  }}
                 />
-              ))}
+              )}
+            </div>
 
-            {/* Selection Box */}
-            {selectionBox && (
-              <div className="absolute border-2 border-accent-blue bg-accent-blue/10 pointer-events-none z-[9999] rounded"
-                style={{
-                  left: Math.min(selectionBox.startX, selectionBox.endX),
-                  top: Math.min(selectionBox.startY, selectionBox.endY),
-                  width: Math.abs(selectionBox.endX - selectionBox.startX),
-                  height: Math.abs(selectionBox.endY - selectionBox.startY),
-                }}
-              />
-            )}
-          </div>
-
-          {/* Canvas Info Overlay */}
-          <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs text-white/90 pointer-events-none">
-            16:9 Canvas • {CANVAS_WIDTH} × {CANVAS_HEIGHT}px
+            {/* Canvas Info Overlay */}
+            <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded text-xs text-white/90 pointer-events-none">
+              16:9 Canvas • {CANVAS_WIDTH} × {CANVAS_HEIGHT}px
+            </div>
           </div>
         </div>
       </div>
@@ -350,7 +366,7 @@ const GridCanvas = () => {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center animate-fadeIn">
             <div className="text-6xl mb-4 opacity-20">✨</div>
-            <h3 className="text-xl font-semibold text-white/80 mb-2">Your Full HD canvas awaits</h3>
+            <h3 className="text-xl font-semibold text-white/80 mb-2">Your canvas awaits</h3>
             <p className="text-sm text-white/50 mb-4">Add widgets from the sidebar to get started</p>
             <div className="text-xs text-white/40">
               Canvas: {CANVAS_WIDTH} × {CANVAS_HEIGHT}px ({gridColumns} columns × {maxRows} rows)

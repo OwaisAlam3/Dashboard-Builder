@@ -1,8 +1,8 @@
-// src/components/Dashboard/DashboardLayout.jsx - FIXED VERSION
+// src/components/Dashboard/DashboardLayout.jsx - Complete with Fit-to-Screen
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Menu, Save, Download, Upload, Trash2, Grid, ZoomIn, ZoomOut,
-  Maximize2, Undo2, Redo2, Copy, Clipboard, Check, Sparkles, AlertCircle
+  Maximize2, Minimize2, Undo2, Redo2, Copy, Clipboard, Check, Sparkles, AlertCircle
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { usePersistentLayout } from '../../hooks/usePersistentLayout';
@@ -16,7 +16,7 @@ const DashboardLayout = () => {
     sidebarOpen, sidebarWidth, setSidebarWidth,
     propertyPanelOpen, propertyPanelWidth, setPropertyPanelWidth,
     toggleSidebar, showGrid, toggleGrid,
-    canvasZoom, setCanvasZoom, resetCanvasView,
+    canvasZoom, setCanvasZoom, resetCanvasView, fitCanvasToScreen,
     clearDashboard, saveToLocalStorage, exportDashboard, importDashboard,
     undo, redo, historyIndex, history,
     copySelectedWidgets, pasteWidgets, selectedWidgetIds,
@@ -27,11 +27,29 @@ const DashboardLayout = () => {
   const [isResizingProperty, setIsResizingProperty] = useState(false);
   const [saveIndicator, setSaveIndicator] = useState(false);
   const [error, setError] = useState(null);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const sidebarDividerRef = useRef(null);
   const propertyDividerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
 
   usePersistentLayout();
+
+  // Track viewport size for fit-to-screen
+  useEffect(() => {
+    const updateViewportSize = () => {
+      const canvasArea = document.querySelector('.canvas-viewport');
+      if (canvasArea) {
+        setViewportSize({
+          width: canvasArea.clientWidth,
+          height: canvasArea.clientHeight,
+        });
+      }
+    };
+
+    updateViewportSize();
+    window.addEventListener('resize', updateViewportSize);
+    return () => window.removeEventListener('resize', updateViewportSize);
+  }, [sidebarOpen, propertyPanelOpen, sidebarWidth, propertyPanelWidth]);
 
   // Sidebar resize handler
   useEffect(() => {
@@ -85,7 +103,7 @@ const DashboardLayout = () => {
     };
   }, [isResizingProperty, setPropertyPanelWidth]);
 
-  // FIXED: Keyboard shortcuts with proper preventDefault
+  // Keyboard shortcuts with proper preventDefault
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
@@ -144,7 +162,7 @@ const DashboardLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, copySelectedWidgets, pasteWidgets, selectedWidgetIds, toggleGrid]);
 
-  // FIXED: Save with proper timeout cleanup
+  // Save with proper timeout cleanup
   const handleSave = () => {
     try {
       saveToLocalStorage();
@@ -191,7 +209,7 @@ const DashboardLayout = () => {
     }
   };
 
-  // FIXED: Import with detailed error handling
+  // Import with detailed error handling
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -239,6 +257,12 @@ const DashboardLayout = () => {
   const handleZoomOut = () => {
     const newZoom = Math.max(0.25, canvasZoom - 0.25);
     setCanvasZoom(newZoom);
+  };
+
+  const handleFitToScreen = () => {
+    if (viewportSize.width > 0 && viewportSize.height > 0) {
+      fitCanvasToScreen(viewportSize.width, viewportSize.height);
+    }
   };
 
   const handleNewDashboard = () => {
@@ -321,8 +345,12 @@ const DashboardLayout = () => {
             className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Zoom In">
             <ZoomIn size={18} />
           </button>
+          <button onClick={handleFitToScreen}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Fit to Screen">
+            <Minimize2 size={18} />
+          </button>
           <button onClick={resetCanvasView}
-            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Reset View">
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Reset to 100%">
             <Maximize2 size={18} />
           </button>
           
@@ -366,7 +394,7 @@ const DashboardLayout = () => {
           </>
         )}
 
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden canvas-viewport">
           <GridCanvas />
         </div>
 

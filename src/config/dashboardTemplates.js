@@ -32,7 +32,7 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'stats',
-        gridArea: { x: 0, y: 0, w: 3, h: 2 },
+        gridArea: { x: 0, y: 0, w: 6, h: 2 },
         data: {
           title: 'Total Revenue',
           value: '$45,231',
@@ -44,7 +44,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 3, y: 0, w: 3, h: 2 },
+        gridArea: { x: 6, y: 0, w: 6, h: 2 },
         data: {
           title: 'Active Users',
           value: '2,845',
@@ -56,7 +56,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 6, y: 0, w: 3, h: 2 },
+        gridArea: { x: 12, y: 0, w: 6, h: 2 },
         data: {
           title: 'Conversion Rate',
           value: '3.24%',
@@ -68,7 +68,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 9, y: 0, w: 3, h: 2 },
+        gridArea: { x: 18, y: 0, w: 6, h: 2 },
         data: {
           title: 'Total Orders',
           value: '1,234',
@@ -80,7 +80,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 0, y: 2, w: 8, h: 4 },
+        gridArea: { x: 0, y: 2, w: 16, h: 5 },
         data: {
           title: 'Revenue Overview',
           chartType: 'line',
@@ -93,13 +93,36 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 8, y: 2, w: 4, h: 4 },
+        gridArea: { x: 16, y: 2, w: 8, h: 5 },
         data: {
           title: 'Sales by Category',
           chartType: 'pie',
           bgColor: '#ffffff',
           primaryColor: '#3b82f6',
           showLegend: true
+        }
+      },
+      {
+        type: 'chart',
+        gridArea: { x: 0, y: 7, w: 12, h: 5 },
+        data: {
+          title: 'Monthly Performance',
+          chartType: 'bar',
+          bgColor: '#ffffff',
+          primaryColor: '#10b981',
+          showGrid: true,
+          showLegend: false
+        }
+      },
+      {
+        type: 'card',
+        gridArea: { x: 12, y: 7, w: 12, h: 5 },
+        data: {
+          title: 'Key Insights',
+          content: '📈 Revenue up 20% month-over-month\n\n👥 User engagement increased by 12.5%\n\n🎯 Conversion rate improved by 0.17pp\n\n🚀 Mobile traffic grew 45% this quarter\n\n💡 Top performing product: Premium Plan',
+          bgColor: '#f8fafc',
+          titleColor: '#1e293b',
+          textColor: '#475569'
         }
       }
     ]
@@ -115,19 +138,19 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'card',
-        gridArea: { x: 0, y: 0, w: 12, h: 2 },
+        gridArea: { x: 0, y: 0, w: 24, h: 2 },
         data: {
           title: 'Welcome to My Portfolio',
-          content: 'I\'m a designer and developer passionate about creating beautiful digital experiences.',
-          bgColor: '#ffffff',
+          content: 'Designer & Developer passionate about creating beautiful digital experiences that combine form and function.',
+          bgColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           titleSize: 'xl',
-          titleColor: '#1e293b',
-          textColor: '#64748b'
+          titleColor: '#ffffff',
+          textColor: '#e0e7ff'
         }
       },
       {
         type: 'image',
-        gridArea: { x: 0, y: 2, w: 4, h: 3 },
+        gridArea: { x: 0, y: 2, w: 8, h: 5 },
         data: {
           url: 'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=800',
           alt: 'Project 1',
@@ -139,7 +162,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'image',
-        gridArea: { x: 4, y: 2, w: 4, h: 3 },
+        gridArea: { x: 8, y: 2, w: 8, h: 5 },
         data: {
           url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
           alt: 'Project 2',
@@ -151,7 +174,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'image',
-        gridArea: { x: 8, y: 2, w: 4, h: 3 },
+        gridArea: { x: 16, y: 2, w: 8, h: 5 },
         data: {
           url: 'https://images.unsplash.com/photo-1618005198920-f0cb2d8d9a7e?w=800',
           alt: 'Project 3',
@@ -163,24 +186,24 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 0, y: 5, w: 6, h: 3 },
+        gridArea: { x: 0, y: 7, w: 12, h: 5 },
         data: {
           title: 'About Me',
-          content: 'With over 5 years of experience in design and development, I specialize in creating user-centered digital products that combine aesthetics with functionality.',
-          bgColor: '#f8fafc',
+          content: 'With over 5 years of experience in design and development, I specialize in creating user-centered digital products.\n\n✨ User Experience Design\n🎨 Visual Design & Branding\n💻 Front-end Development\n📱 Responsive & Mobile-First',
+          bgColor: '#ffffff',
           titleColor: '#1e293b',
-          textColor: '#64748b'
+          textColor: '#475569'
         }
       },
       {
         type: 'card',
-        gridArea: { x: 6, y: 5, w: 6, h: 3 },
+        gridArea: { x: 12, y: 7, w: 12, h: 5 },
         data: {
-          title: 'Skills',
-          content: 'UI/UX Design • React • TypeScript • Figma • Adobe Creative Suite • Responsive Design • Prototyping',
+          title: 'Skills & Expertise',
+          content: '🎯 UI/UX Design\n⚛️ React & TypeScript\n🎨 Figma & Adobe Suite\n📐 Responsive Design\n🚀 Performance Optimization\n♿ Accessibility Standards\n🔧 Design Systems',
           bgColor: '#f8fafc',
           titleColor: '#1e293b',
-          textColor: '#64748b'
+          textColor: '#475569'
         }
       }
     ]
@@ -196,18 +219,18 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'card',
-        gridArea: { x: 0, y: 0, w: 8, h: 2 },
+        gridArea: { x: 0, y: 0, w: 14, h: 2 },
         data: {
-          title: 'Current Sprint',
-          content: 'Sprint 23 - Ends in 5 days\n\n✅ 12 tasks completed\n⏳ 8 tasks in progress\n📝 4 tasks pending',
-          bgColor: '#ffffff',
-          titleColor: '#1e293b',
-          textColor: '#64748b'
+          title: 'Current Sprint - Sprint 23',
+          content: '⏱️ Ends in 5 days  •  ✅ 12 completed  •  ⏳ 8 in progress  •  📝 4 pending',
+          bgColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          titleColor: '#ffffff',
+          textColor: '#e0e7ff'
         }
       },
       {
         type: 'stats',
-        gridArea: { x: 8, y: 0, w: 4, h: 2 },
+        gridArea: { x: 14, y: 0, w: 5, h: 2 },
         data: {
           title: 'Team Velocity',
           value: '42',
@@ -218,8 +241,20 @@ export const DASHBOARD_TEMPLATES = {
         }
       },
       {
+        type: 'stats',
+        gridArea: { x: 19, y: 0, w: 5, h: 2 },
+        data: {
+          title: 'Sprint Progress',
+          value: '66%',
+          change: 'On track',
+          description: '20 of 30 tasks',
+          bgColor: '#10b981',
+          icon: 'trending-up'
+        }
+      },
+      {
         type: 'calendar',
-        gridArea: { x: 0, y: 2, w: 6, h: 4 },
+        gridArea: { x: 0, y: 2, w: 12, h: 5 },
         data: {
           title: 'Project Timeline',
           bgColor: '#ffffff',
@@ -228,9 +263,9 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 6, y: 2, w: 6, h: 4 },
+        gridArea: { x: 12, y: 2, w: 12, h: 5 },
         data: {
-          title: 'Task Completion Rate',
+          title: 'Task Completion Trend',
           chartType: 'bar',
           bgColor: '#ffffff',
           primaryColor: '#10b981',
@@ -240,10 +275,10 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 0, y: 6, w: 4, h: 2 },
+        gridArea: { x: 0, y: 7, w: 8, h: 5 },
         data: {
           title: 'Upcoming Deadlines',
-          content: '• Website Redesign - Jan 15\n• Mobile App Launch - Jan 20\n• Q1 Report - Jan 31',
+          content: '🎯 Website Redesign - Jan 15\n📱 Mobile App Launch - Jan 20\n📊 Q1 Report - Jan 31\n🚀 Feature Release - Feb 5\n📝 Documentation Update - Feb 10',
           bgColor: '#fef3c7',
           titleColor: '#92400e',
           textColor: '#78350f'
@@ -251,10 +286,10 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 4, y: 6, w: 4, h: 2 },
+        gridArea: { x: 8, y: 7, w: 8, h: 5 },
         data: {
-          title: 'Team Notes',
-          content: 'Remember: Daily standup at 9 AM\nDesign review on Friday\nClient presentation next week',
+          title: 'Team Updates',
+          content: '💬 Daily standup at 9 AM\n🎨 Design review Friday 2 PM\n👥 Client presentation next week\n📚 Sprint planning on Monday\n🎉 Team lunch on Thursday',
           bgColor: '#dbeafe',
           titleColor: '#1e40af',
           textColor: '#1e3a8a'
@@ -262,10 +297,10 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 8, y: 6, w: 4, h: 2 },
+        gridArea: { x: 16, y: 7, w: 8, h: 5 },
         data: {
-          title: 'Blockers',
-          content: '⚠️ API integration pending\n⚠️ Design assets needed\n⚠️ Database migration',
+          title: 'Blockers & Risks',
+          content: '⚠️ API integration pending approval\n⚠️ Design assets needed by Friday\n⚠️ Database migration scheduled\n⚠️ Third-party dependency issue\n⚠️ Testing environment setup',
           bgColor: '#fee2e2',
           titleColor: '#991b1b',
           textColor: '#7f1d1d'
@@ -284,7 +319,7 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'stats',
-        gridArea: { x: 0, y: 0, w: 3, h: 2 },
+        gridArea: { x: 0, y: 0, w: 6, h: 2 },
         data: {
           title: 'Total Sales',
           value: '$128K',
@@ -296,7 +331,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 3, y: 0, w: 3, h: 2 },
+        gridArea: { x: 6, y: 0, w: 6, h: 2 },
         data: {
           title: 'Orders',
           value: '1,847',
@@ -308,19 +343,19 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 6, y: 0, w: 3, h: 2 },
+        gridArea: { x: 12, y: 0, w: 6, h: 2 },
         data: {
-          title: 'Customers',
+          title: 'New Customers',
           value: '892',
           change: '+12%',
-          description: 'New this month',
+          description: 'This month',
           bgColor: '#8b5cf6',
           icon: 'users'
         }
       },
       {
         type: 'stats',
-        gridArea: { x: 9, y: 0, w: 3, h: 2 },
+        gridArea: { x: 18, y: 0, w: 6, h: 2 },
         data: {
           title: 'Avg Order Value',
           value: '$69',
@@ -332,7 +367,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 0, y: 2, w: 7, h: 4 },
+        gridArea: { x: 0, y: 2, w: 14, h: 5 },
         data: {
           title: 'Sales Trend',
           chartType: 'area',
@@ -344,7 +379,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 7, y: 2, w: 5, h: 4 },
+        gridArea: { x: 14, y: 2, w: 10, h: 5 },
         data: {
           title: 'Top Products',
           chartType: 'bar',
@@ -355,22 +390,24 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 0, y: 6, w: 6, h: 2 },
+        gridArea: { x: 0, y: 7, w: 12, h: 5 },
         data: {
           title: 'Recent Orders',
-          content: '#1234 - $129.99 - Processing\n#1235 - $89.50 - Shipped\n#1236 - $249.00 - Delivered\n#1237 - $65.25 - Processing',
+          content: '📦 #1234 - $129.99 - Processing\n🚚 #1235 - $89.50 - Shipped\n✅ #1236 - $249.00 - Delivered\n📦 #1237 - $65.25 - Processing\n🚚 #1238 - $159.00 - Shipped\n✅ #1239 - $79.99 - Delivered',
           bgColor: '#ffffff',
-          titleColor: '#1e293b'
+          titleColor: '#1e293b',
+          textColor: '#475569'
         }
       },
       {
         type: 'card',
-        gridArea: { x: 6, y: 6, w: 6, h: 2 },
+        gridArea: { x: 12, y: 7, w: 12, h: 5 },
         data: {
-          title: 'Low Stock Alert',
-          content: '⚠️ Product A - 5 units left\n⚠️ Product B - 3 units left\n⚠️ Product C - 8 units left',
+          title: 'Inventory Alerts',
+          content: '⚠️ Premium Headphones - 5 units left\n⚠️ Wireless Mouse - 3 units left\n⚠️ USB-C Cable - 8 units left\n⚠️ Laptop Stand - 4 units left\n✅ Keyboard - 45 units (Good)\n✅ Monitor - 28 units (Good)',
           bgColor: '#fef3c7',
-          titleColor: '#92400e'
+          titleColor: '#92400e',
+          textColor: '#78350f'
         }
       }
     ]
@@ -386,7 +423,7 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'stats',
-        gridArea: { x: 0, y: 0, w: 4, h: 2 },
+        gridArea: { x: 0, y: 0, w: 6, h: 2 },
         data: {
           title: 'Total Followers',
           value: '45.2K',
@@ -398,19 +435,19 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'stats',
-        gridArea: { x: 4, y: 0, w: 4, h: 2 },
+        gridArea: { x: 6, y: 0, w: 6, h: 2 },
         data: {
           title: 'Engagement Rate',
           value: '4.8%',
           change: '+0.3%',
           description: 'This week',
           bgColor: '#8b5cf6',
-          icon: 'trending-up'
+          icon: 'heart'
         }
       },
       {
         type: 'stats',
-        gridArea: { x: 8, y: 0, w: 4, h: 2 },
+        gridArea: { x: 12, y: 0, w: 6, h: 2 },
         data: {
           title: 'Posts Published',
           value: '28',
@@ -421,8 +458,20 @@ export const DASHBOARD_TEMPLATES = {
         }
       },
       {
+        type: 'stats',
+        gridArea: { x: 18, y: 0, w: 6, h: 2 },
+        data: {
+          title: 'Reach',
+          value: '128K',
+          change: '+23%',
+          description: 'This week',
+          bgColor: '#10b981',
+          icon: 'trending-up'
+        }
+      },
+      {
         type: 'chart',
-        gridArea: { x: 0, y: 2, w: 8, h: 4 },
+        gridArea: { x: 0, y: 2, w: 16, h: 5 },
         data: {
           title: 'Follower Growth',
           chartType: 'line',
@@ -435,7 +484,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'chart',
-        gridArea: { x: 8, y: 2, w: 4, h: 4 },
+        gridArea: { x: 16, y: 2, w: 8, h: 5 },
         data: {
           title: 'Content Performance',
           chartType: 'pie',
@@ -446,12 +495,24 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 0, y: 6, w: 12, h: 2 },
+        gridArea: { x: 0, y: 7, w: 12, h: 5 },
         data: {
           title: 'Top Performing Posts',
-          content: '1. "Summer Sale Announcement" - 2.4K likes, 180 comments\n2. "Behind the Scenes" - 1.8K likes, 142 comments\n3. "Customer Spotlight" - 1.5K likes, 96 comments',
+          content: '🔥 "Summer Sale Announcement"\n   2.4K likes • 180 comments • 450 shares\n\n📸 "Behind the Scenes"\n   1.8K likes • 142 comments • 320 shares\n\n💡 "Customer Spotlight"\n   1.5K likes • 96 comments • 210 shares',
+          bgColor: '#ffffff',
+          titleColor: '#1e293b',
+          textColor: '#475569'
+        }
+      },
+      {
+        type: 'card',
+        gridArea: { x: 12, y: 7, w: 12, h: 5 },
+        data: {
+          title: 'Upcoming Content',
+          content: '📅 Product Launch - Tomorrow\n📅 Tutorial Video - Jan 16\n📅 Community Q&A - Jan 18\n📅 Feature Highlight - Jan 20\n📅 Behind the Scenes - Jan 22\n📅 User Testimonial - Jan 24',
           bgColor: '#f8fafc',
-          titleColor: '#1e293b'
+          titleColor: '#1e293b',
+          textColor: '#475569'
         }
       }
     ]
@@ -467,31 +528,31 @@ export const DASHBOARD_TEMPLATES = {
     widgets: [
       {
         type: 'card',
-        gridArea: { x: 0, y: 0, w: 6, h: 2 },
+        gridArea: { x: 0, y: 0, w: 12, h: 2 },
         data: {
           title: 'Good Morning! 👋',
-          content: 'Today is Sunday, January 11, 2026\n\nYou have 3 tasks scheduled and 1 meeting.',
-          bgColor: '#dbeafe',
-          titleSize: 'lg',
-          titleColor: '#1e40af',
-          textColor: '#1e3a8a'
+          content: 'Today is Wednesday, January 14, 2026\n\nYou have 5 tasks scheduled and 2 meetings today. Let\'s make it productive!',
+          bgColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          titleSize: 'xl',
+          titleColor: '#ffffff',
+          textColor: '#e0e7ff'
         }
       },
       {
         type: 'stats',
-        gridArea: { x: 6, y: 0, w: 3, h: 2 },
+        gridArea: { x: 12, y: 0, w: 6, h: 2 },
         data: {
-          title: 'Tasks Done',
+          title: 'Weekly Progress',
           value: '12/18',
           change: '67%',
-          description: 'This week',
+          description: 'Tasks completed',
           bgColor: '#10b981',
-          icon: 'activity'
+          icon: 'check-circle'
         }
       },
       {
         type: 'stats',
-        gridArea: { x: 9, y: 0, w: 3, h: 2 },
+        gridArea: { x: 18, y: 0, w: 6, h: 2 },
         data: {
           title: 'Productivity',
           value: '85%',
@@ -503,7 +564,7 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'calendar',
-        gridArea: { x: 0, y: 2, w: 6, h: 4 },
+        gridArea: { x: 0, y: 2, w: 12, h: 5 },
         data: {
           title: 'My Calendar',
           bgColor: '#ffffff',
@@ -512,22 +573,46 @@ export const DASHBOARD_TEMPLATES = {
       },
       {
         type: 'card',
-        gridArea: { x: 6, y: 2, w: 6, h: 2 },
+        gridArea: { x: 12, y: 2, w: 12, h: 5 },
         data: {
-          title: 'Today\'s Tasks',
-          content: '☐ Morning workout\n☐ Team meeting at 10 AM\n☐ Finish project proposal\n☑ Email client updates\n☐ Grocery shopping',
+          title: 'Today\'s Agenda',
+          content: '🏃 6:30 AM - Morning workout\n☕ 8:00 AM - Breakfast & review emails\n💼 10:00 AM - Team standup meeting\n📝 11:00 AM - Work on project proposal\n🍽️ 1:00 PM - Lunch break\n👥 2:30 PM - Client call\n✅ 4:00 PM - Review & wrap up\n🛒 6:00 PM - Grocery shopping',
           bgColor: '#ffffff',
-          titleColor: '#1e293b'
+          titleColor: '#1e293b',
+          textColor: '#475569'
         }
       },
       {
         type: 'card',
-        gridArea: { x: 6, y: 4, w: 6, h: 2 },
+        gridArea: { x: 0, y: 7, w: 8, h: 5 },
         data: {
-          title: 'Quick Notes',
-          content: '💡 Remember to call dentist\n💡 Birthday gift for Sarah\n💡 Book flight tickets',
+          title: 'This Week\'s Goals',
+          content: '✅ Complete Q1 presentation\n⏳ Finish course module 3\n⏳ Update portfolio website\n☐ Plan weekend trip\n☐ Organize workspace\n☐ Schedule dentist appointment',
+          bgColor: '#f8fafc',
+          titleColor: '#1e293b',
+          textColor: '#475569'
+        }
+      },
+      {
+        type: 'card',
+        gridArea: { x: 8, y: 7, w: 8, h: 5 },
+        data: {
+          title: 'Quick Notes & Reminders',
+          content: '💡 Call dentist for checkup\n💡 Sarah\'s birthday on Jan 20\n💡 Book flight tickets for vacation\n💡 Review insurance policy\n💡 Update LinkedIn profile\n💡 Water the plants',
           bgColor: '#fef3c7',
-          titleColor: '#92400e'
+          titleColor: '#92400e',
+          textColor: '#78350f'
+        }
+      },
+      {
+        type: 'card',
+        gridArea: { x: 16, y: 7, w: 8, h: 5 },
+        data: {
+          title: 'Habit Tracker',
+          content: '💪 Exercise: 4/7 days\n📚 Reading: 3/7 days\n💧 Water intake: 6/7 days\n🧘 Meditation: 5/7 days\n😴 Sleep 8hrs: 5/7 days\n🥗 Healthy eating: 6/7 days',
+          bgColor: '#dbeafe',
+          titleColor: '#1e40af',
+          textColor: '#1e3a8a'
         }
       }
     ]

@@ -1,4 +1,4 @@
-// src/store/dashboardStore.js - Fixed for 1920x1080 Canvas
+// src/store/dashboardStore.js - Complete with Fit-to-Screen
 import { create } from 'zustand';
 import GRID_CONFIG from '../config/gridConfig';
 
@@ -8,9 +8,10 @@ const SIDEBAR_DEFAULT_WIDTH = 280;
 const PROPERTY_PANEL_MIN_WIDTH = 240;
 const PROPERTY_PANEL_MAX_WIDTH = 500;
 const PROPERTY_PANEL_DEFAULT_WIDTH = 320;
+const DEFAULT_CANVAS_ZOOM = 0.7;
 
-// Calculate max rows for fixed 1920x1080 canvas
-const FIXED_MAX_ROWS = GRID_CONFIG.getMaxRows(1080);
+// Calculate max rows for fixed 1366x768 canvas
+const FIXED_MAX_ROWS = GRID_CONFIG.getMaxRows(768);
 
 const checkStorageQuota = () => {
   try {
@@ -48,13 +49,13 @@ const useDashboardStore = create((set, get) => ({
   propertyPanelWidth: PROPERTY_PANEL_DEFAULT_WIDTH,
   showTemplateSelector: false,
 
-  // Canvas State (Fixed 1920x1080)
-  canvasZoom: 1,
+  // Canvas State (Fixed 1366x768)
+  canvasZoom: DEFAULT_CANVAS_ZOOM,
   canvasPan: { x: 0, y: 0 },
   showGrid: true,
-  gridColumns: 24, // Fixed for 1920px canvas
+  gridColumns: 24,
   currentBreakpoint: 'lg',
-  maxRows: FIXED_MAX_ROWS, // Calculated from 1080px height
+  maxRows: FIXED_MAX_ROWS,
 
   // Widget State
   widgets: [],
@@ -83,13 +84,23 @@ const useDashboardStore = create((set, get) => ({
   // Canvas Actions
   setCanvasZoom: (zoom) => set({ canvasZoom: Math.max(0.25, Math.min(3, zoom)) }),
   setCanvasPan: (pan) => set({ canvasPan: pan }),
-  resetCanvasView: () => set({ canvasZoom: 1, canvasPan: { x: 0, y: 0 } }),
+  resetCanvasView: () => set({ canvasZoom: DEFAULT_CANVAS_ZOOM, canvasPan: { x: 0, y: 0 } }),
+  
+  // Fit canvas to viewport
+  fitCanvasToScreen: (viewportWidth, viewportHeight) => {
+    const zoom = GRID_CONFIG.calculateFitZoom(viewportWidth, viewportHeight);
+    set({ 
+      canvasZoom: zoom,
+      canvasPan: { x: 0, y: 0 }
+    });
+  },
+  
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   setCurrentBreakpoint: (breakpoint) => set({ currentBreakpoint: breakpoint }),
   updateGridColumns: (columns) => set({ gridColumns: columns }),
   setMaxRows: (rows) => set({ maxRows: rows }),
 
-  // Enhanced Collision Detection with fixed canvas boundaries (1920x1080)
+  // Enhanced Collision Detection
   checkCollision: (widget, excludeId = null) => {
     try {
       const state = get();
@@ -100,12 +111,12 @@ const useDashboardStore = create((set, get) => ({
         return true;
       }
 
-      // Check column bounds (24 columns for 1920px)
+      // Check column bounds
       if (x + w > state.gridColumns) {
         return true;
       }
 
-      // Check row bounds (within fixed 1920x1080 canvas)
+      // Check row bounds
       if (y + h > state.maxRows) {
         return true;
       }
@@ -128,12 +139,23 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
+  // Smart findEmptySpace - tries top-left first, then anywhere on grid
   findEmptySpace: (width, height) => {
     const state = get();
     const maxColumns = state.gridColumns;
     const maxRows = state.maxRows;
 
-    // Try to find space within fixed canvas bounds
+    // First pass: Try to place near top-left for better UX
+    for (let y = 0; y <= Math.min(3, maxRows - height); y++) {
+      for (let x = 0; x <= maxColumns - width; x++) {
+        const testWidget = { gridArea: { x, y, w: width, h: height } };
+        if (!state.checkCollision(testWidget)) {
+          return { x, y };
+        }
+      }
+    }
+
+    // Second pass: Try ALL positions - allows placement anywhere
     for (let y = 0; y <= maxRows - height; y++) {
       for (let x = 0; x <= maxColumns - width; x++) {
         const testWidget = { gridArea: { x, y, w: width, h: height } };
@@ -143,7 +165,7 @@ const useDashboardStore = create((set, get) => ({
       }
     }
 
-    // If no space found, place at bottom (might overflow - user will need to adjust)
+    // If no space found, place at bottom
     const maxY = Math.max(...state.widgets.map(w => w.gridArea.y + w.gridArea.h), 0);
     return { x: 0, y: Math.min(maxY, maxRows - height) };
   },
@@ -189,7 +211,7 @@ const useDashboardStore = create((set, get) => ({
       gridArea = { x: position.x, y: position.y, w: defaultWidth, h: defaultHeight };
     }
 
-    // Ensure widget fits within fixed 1920x1080 canvas
+    // Ensure widget fits within canvas
     if (gridArea.x + gridArea.w > state.gridColumns) {
       gridArea.w = state.gridColumns - gridArea.x;
     }
@@ -252,7 +274,7 @@ const useDashboardStore = create((set, get) => ({
     const maxColumns = state.gridColumns;
     const maxRows = state.maxRows;
 
-    // Constrain to fixed canvas boundaries (1920x1080)
+    // Constrain to canvas boundaries
     const constrainedArea = {
       x: Math.max(0, Math.min(gridArea.x, maxColumns - gridArea.w)),
       y: Math.max(0, Math.min(gridArea.y, maxRows - gridArea.h)),
@@ -260,7 +282,7 @@ const useDashboardStore = create((set, get) => ({
       h: Math.max(GRID_CONFIG.minWidgetHeight, Math.min(gridArea.h, maxRows))
     };
 
-    // Ensure widget doesn't exceed fixed canvas bounds
+    // Ensure widget doesn't exceed canvas bounds
     if (constrainedArea.x + constrainedArea.w > maxColumns) {
       constrainedArea.w = maxColumns - constrainedArea.x;
     }
@@ -348,7 +370,7 @@ const useDashboardStore = create((set, get) => ({
 
   // Template Management
   loadTemplate: (template) => {
-    set({ widgets: [], selectedWidgetIds: [], propertyPanelOpen: false });
+    set({ widgets: [], selectedWidgetIds: [], propertyPanelOpen: false, canvasZoom: DEFAULT_CANVAS_ZOOM, canvasPan: { x: 0, y: 0 }, });
     const newWidgets = template.widgets.map((widgetConfig, index) => ({
       id: `widget-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       type: widgetConfig.type,
@@ -362,6 +384,7 @@ const useDashboardStore = create((set, get) => ({
     }));
 
     set({ widgets: newWidgets });
+
     get().saveToHistory();
     get().saveToLocalStorage();
   },
@@ -482,13 +505,12 @@ const useDashboardStore = create((set, get) => ({
     try {
       const saveData = {
         widgets: state.widgets,
-        canvasZoom: state.canvasZoom,
-        canvasPan: state.canvasPan,
+
         showGrid: state.showGrid,
         gridColumns: state.gridColumns,
         sidebarWidth: state.sidebarWidth,
         propertyPanelWidth: state.propertyPanelWidth,
-        version: '4.0.0', // Updated version for fixed canvas
+        version: '4.0.0',
       };
 
       const serialized = JSON.stringify(saveData);
@@ -515,15 +537,14 @@ const useDashboardStore = create((set, get) => ({
       const savedData = localStorage.getItem('figma-dashboard-grid');
       if (savedData) {
         const data = JSON.parse(savedData);
-        // Support versions 3.x and 4.x
-        if (data.version && data.version.startsWith('3.') || data.version === '4.0.0') {
+        if (data.version && (data.version.startsWith('3.') || data.version === '4.0.0')) {
           if (data.widgets) {
             set({
               widgets: data.widgets || [],
-              canvasZoom: data.canvasZoom || 1,
-              canvasPan: data.canvasPan || { x: 0, y: 0 },
+              canvasZoom: DEFAULT_CANVAS_ZOOM,
+              canvasPan: { x: 0, y: 0 },
               showGrid: data.showGrid !== undefined ? data.showGrid : true,
-              gridColumns: 24, // Always use 24 for fixed canvas
+              gridColumns: 24,
               sidebarWidth: data.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
               propertyPanelWidth: data.propertyPanelWidth || PROPERTY_PANEL_DEFAULT_WIDTH,
             });
@@ -532,7 +553,7 @@ const useDashboardStore = create((set, get) => ({
               get().saveToHistory();
             }
           } else {
-            set({ showTemplateSelector: true });
+            set({ showTemplateSelector: true }); 
           }
         } else {
           set({ showTemplateSelector: true });
@@ -552,7 +573,7 @@ const useDashboardStore = create((set, get) => ({
       selectedWidgetIds: [],
       history: [],
       historyIndex: -1,
-      canvasZoom: 1,
+      canvasZoom: DEFAULT_CANVAS_ZOOM,
       canvasPan: { x: 0, y: 0 },
     });
     try {
@@ -585,7 +606,9 @@ const useDashboardStore = create((set, get) => ({
       widgets: data.widgets,
       selectedWidgetIds: [],
       showGrid: data.settings?.showGrid !== undefined ? data.settings.showGrid : true,
-      gridColumns: 24, // Always use 24 for fixed canvas
+      canvasZoom: DEFAULT_CANVAS_ZOOM,
+      canvasPan: { x: 0, y: 0 },
+      gridColumns: 24,
     });
 
     get().saveToHistory();
