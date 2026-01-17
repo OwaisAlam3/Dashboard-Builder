@@ -1,19 +1,50 @@
 // src/components/Templates/TemplateSelector.jsx
-import React, { useState } from 'react';
-import { X, Search, Sparkles } from 'lucide-react';
-import { DASHBOARD_TEMPLATES, TEMPLATE_CATEGORIES } from '../../config/dashboardTemplates';
+import React, { useState, useEffect } from 'react';
+import { X, Search, Sparkles, AlertCircle, Loader2, LayoutDashboard } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 
 const TemplateSelector = () => {
-  const { setShowTemplateSelector, loadTemplate } = useDashboardStore();
+  const { 
+    setShowTemplateSelector, 
+    loadTemplate,
+    templates,
+    templatesLoading,
+    templatesError,
+    fetchTemplates
+  } = useDashboardStore();
+  
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredTemplates = Object.values(DASHBOARD_TEMPLATES).filter(template => {
+  // Fetch templates on component mount
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
+
+  // Extract unique categories from templates
+  const categories = React.useMemo(() => {
+    const uniqueCategories = new Set();
+    templates.forEach(template => {
+      if (template.category) {
+        uniqueCategories.add(template.category);
+      }
+    });
+    
+    return [
+      { id: 'all', name: 'All Templates', icon: LayoutDashboard },
+      ...Array.from(uniqueCategories).map(cat => ({
+        id: cat,
+        name: cat.charAt(0).toUpperCase() + cat.slice(1),
+        icon: LayoutDashboard
+      }))
+    ];
+  }, [templates]);
+
+  const filteredTemplates = templates.filter(template => {
     const matchesCategory = selectedCategory === 'all' || template.category === selectedCategory || template.id === 'blank';
     const matchesSearch = 
       template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      template.description.toLowerCase().includes(searchTerm.toLowerCase());
+      (template.description && template.description.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesCategory && matchesSearch;
   });
 
@@ -61,7 +92,7 @@ const TemplateSelector = () => {
 
           {/* Categories */}
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {TEMPLATE_CATEGORIES.map(category => {
+            {categories.map(category => {
               const Icon = category.icon;
               return (
                 <button
@@ -83,7 +114,24 @@ const TemplateSelector = () => {
 
         {/* Templates Grid */}
         <div className="flex-1 overflow-y-auto p-6">
-          {filteredTemplates.length === 0 ? (
+          {templatesLoading ? (
+            <div className="text-center py-16">
+              <Loader2 className="mx-auto mb-4 animate-spin text-accent-blue" size={48} />
+              <p className="text-lg text-white/60">Loading templates...</p>
+            </div>
+          ) : templatesError ? (
+            <div className="text-center py-16">
+              <AlertCircle className="mx-auto mb-4 text-red-400" size={48} />
+              <p className="text-lg text-white/60 mb-2">Failed to load templates</p>
+              <p className="text-sm text-white/40 mb-4">{templatesError}</p>
+              <button
+                onClick={fetchTemplates}
+                className="px-4 py-2 bg-accent-blue text-white rounded-lg hover:bg-accent-blue/80 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredTemplates.length === 0 ? (
             <div className="text-center py-16">
               <div className="text-6xl mb-4 opacity-20">🔍</div>
               <p className="text-lg text-white/60">No templates found</p>
@@ -92,7 +140,9 @@ const TemplateSelector = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredTemplates.map((template) => {
-                const Icon = template.icon;
+                const Icon = template.icon || LayoutDashboard;
+                const thumbnail = template.thumbnail || '🎨';
+                
                 return (
                   <button
                     key={template.id}
@@ -102,7 +152,7 @@ const TemplateSelector = () => {
                     {/* Template Preview */}
                     <div className="aspect-video bg-gradient-to-br from-accent-blue/20 to-purple-500/20 flex items-center justify-center border-b border-panel-border">
                       <div className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                        {template.thumbnail}
+                        {thumbnail}
                       </div>
                     </div>
 
@@ -110,19 +160,23 @@ const TemplateSelector = () => {
                     <div className="p-4">
                       <div className="flex items-start gap-3 mb-2">
                         <div className="p-2 bg-accent-blue/10 rounded-lg group-hover:bg-accent-blue/20 transition-colors">
-                          <Icon size={20} className="text-accent-blue" />
+                          {typeof Icon === 'string' ? (
+                            <LayoutDashboard size={20} className="text-accent-blue" />
+                          ) : (
+                            <Icon size={20} className="text-accent-blue" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-white mb-1 group-hover:text-accent-blue transition-colors">
                             {template.name}
                           </h3>
                           <p className="text-sm text-white/60 line-clamp-2">
-                            {template.description}
+                            {template.description || 'No description available'}
                           </p>
                         </div>
                       </div>
 
-                      {template.widgets.length > 0 && (
+                      {template.widgets && template.widgets.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-white/5">
                           <p className="text-xs text-white/40">
                             {template.widgets.length} widget{template.widgets.length !== 1 ? 's' : ''}

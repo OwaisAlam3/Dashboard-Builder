@@ -1,4 +1,4 @@
-// src/store/dashboardStore.js - Complete with Fit-to-Screen
+// src/store/dashboardStore.js - Complete with API Template Fetching
 import { create } from 'zustand';
 import GRID_CONFIG from '../config/gridConfig';
 
@@ -49,6 +49,11 @@ const useDashboardStore = create((set, get) => ({
   propertyPanelWidth: PROPERTY_PANEL_DEFAULT_WIDTH,
   showTemplateSelector: false,
 
+  // Template State
+  templates: [],
+  templatesLoading: false,
+  templatesError: null,
+
   // Canvas State (Fixed 1366x768)
   canvasZoom: DEFAULT_CANVAS_ZOOM,
   canvasPan: { x: 0, y: 0 },
@@ -73,6 +78,32 @@ const useDashboardStore = create((set, get) => ({
   history: [],
   historyIndex: -1,
   maxHistory: 50,
+
+  // Template Actions
+  fetchTemplates: async () => {
+    set({ templatesLoading: true, templatesError: null });
+    
+    try {
+      const response = await fetch('http://localhost:4000/api/templates');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      set({ 
+        templates: data, 
+        templatesLoading: false,
+        templatesError: null 
+      });
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+      set({ 
+        templatesLoading: false,
+        templatesError: error.message || 'Failed to load templates'
+      });
+    }
+  },
 
   // UI Actions
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
@@ -505,7 +536,6 @@ const useDashboardStore = create((set, get) => ({
     try {
       const saveData = {
         widgets: state.widgets,
-
         showGrid: state.showGrid,
         gridColumns: state.gridColumns,
         sidebarWidth: state.sidebarWidth,

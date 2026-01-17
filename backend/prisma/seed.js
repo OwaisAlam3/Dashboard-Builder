@@ -1,22 +1,13 @@
-// src/config/dashboardTemplates.js
-import { 
-  BarChart3, 
-  TrendingUp,
-  FileText,
-  Calendar,
-  Map,
-  Image as ImageIcon,
-  LayoutDashboard,
-  PieChart,
-  Users
-} from 'lucide-react';
+import { PrismaClient } from '@prisma/client';
 
-export const DASHBOARD_TEMPLATES = {
+const prisma = new PrismaClient();
+
+// Dashboard templates data
+const DASHBOARD_TEMPLATES = {
   blank: {
     id: 'blank',
     name: 'Blank Canvas',
     description: 'Start from scratch with an empty dashboard',
-    icon: LayoutDashboard,
     category: 'basic',
     thumbnail: '🎨',
     widgets: []
@@ -26,7 +17,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'analytics',
     name: 'Analytics Dashboard',
     description: 'Perfect for tracking KPIs and data metrics',
-    icon: BarChart3,
     category: 'business',
     thumbnail: '📊',
     widgets: [
@@ -132,7 +122,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'portfolio',
     name: 'Portfolio Showcase',
     description: 'Showcase your work with images and descriptions',
-    icon: ImageIcon,
     category: 'creative',
     thumbnail: '🎭',
     widgets: [
@@ -164,7 +153,7 @@ export const DASHBOARD_TEMPLATES = {
         type: 'image',
         gridArea: { x: 8, y: 2, w: 8, h: 5 },
         data: {
-          url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800',
+          url: 'https://images.unsplash.com/photo-618005182384-a83a8bd57fbe?w=800',
           alt: 'Project 2',
           objectFit: 'cover',
           borderRadius: 8,
@@ -213,7 +202,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'projectManagement',
     name: 'Project Manager',
     description: 'Track projects, tasks, and team progress',
-    icon: Users,
     category: 'productivity',
     thumbnail: '📋',
     widgets: [
@@ -313,7 +301,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'ecommerce',
     name: 'E-Commerce',
     description: 'Monitor sales, orders, and store performance',
-    icon: TrendingUp,
     category: 'business',
     thumbnail: '🛍️',
     widgets: [
@@ -417,7 +404,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'social',
     name: 'Social Media',
     description: 'Track engagement and content performance',
-    icon: PieChart,
     category: 'marketing',
     thumbnail: '📱',
     widgets: [
@@ -522,7 +508,6 @@ export const DASHBOARD_TEMPLATES = {
     id: 'personal',
     name: 'Personal Dashboard',
     description: 'Your daily planner and life organizer',
-    icon: Calendar,
     category: 'productivity',
     thumbnail: '📅',
     widgets: [
@@ -619,10 +604,99 @@ export const DASHBOARD_TEMPLATES = {
   }
 };
 
-export const TEMPLATE_CATEGORIES = [
-  { id: 'all', name: 'All Templates', icon: LayoutDashboard },
-  { id: 'business', name: 'Business', icon: BarChart3 },
-  { id: 'creative', name: 'Creative', icon: ImageIcon },
-  { id: 'productivity', name: 'Productivity', icon: Calendar },
-  { id: 'marketing', name: 'Marketing', icon: TrendingUp },
+// Sample dashboards
+const SAMPLE_DASHBOARDS = [
+  {
+    name: 'My First Dashboard',
+    widgets: [
+      {
+        type: 'card',
+        gridArea: { x: 0, y: 0, w: 12, h: 3 },
+        data: {
+          title: 'Welcome!',
+          content: 'This is your first dashboard. Start customizing it by adding widgets from the sidebar.',
+          bgColor: '#3b82f6',
+          titleColor: '#ffffff',
+          textColor: '#e0e7ff'
+        }
+      },
+      {
+        type: 'stats',
+        gridArea: { x: 12, y: 0, w: 6, h: 3 },
+        data: {
+          title: 'Getting Started',
+          value: '1/10',
+          change: '+1',
+          description: 'Steps completed',
+          bgColor: '#10b981',
+          icon: 'check-circle'
+        }
+      },
+      {
+        type: 'stats',
+        gridArea: { x: 18, y: 0, w: 6, h: 3 },
+        data: {
+          title: 'Widgets Added',
+          value: '3',
+          change: 'New',
+          description: 'Total widgets',
+          bgColor: '#8b5cf6',
+          icon: 'layout'
+        }
+      }
+    ]
+  }
 ];
+
+async function main() {
+  console.log('🌱 Starting database seed...');
+
+  // Seed templates
+  console.log('📝 Seeding templates...');
+  const templates = Object.values(DASHBOARD_TEMPLATES);
+  
+  for (const template of templates) {
+    await prisma.template.upsert({
+      where: { id: template.id },
+      update: {
+        name: template.name,
+        description: template.description,
+        category: template.category,
+        thumbnail: template.thumbnail,
+        widgets: template.widgets,
+      },
+      create: {
+        id: template.id,
+        name: template.name,
+        description: template.description,
+        category: template.category,
+        thumbnail: template.thumbnail,
+        widgets: template.widgets,
+      },
+    });
+  }
+  console.log(`✅ Seeded ${templates.length} templates`);
+
+  // Seed sample dashboards
+  console.log('📊 Seeding sample dashboards...');
+  for (const dashboard of SAMPLE_DASHBOARDS) {
+    await prisma.dashboard.create({
+      data: {
+        name: dashboard.name,
+        widgets: dashboard.widgets,
+      },
+    });
+  }
+  console.log(`✅ Seeded ${SAMPLE_DASHBOARDS.length} sample dashboards`);
+
+  console.log('🎉 Database seeding completed!');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error seeding database:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
