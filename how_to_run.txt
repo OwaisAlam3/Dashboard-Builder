@@ -41,6 +41,12 @@ Open a second terminal, start frontend (Vite):
 npm run dev
 
 
+npx prisma db push
+npx prisma generate
+node prisma/seed.js
+
+
+
 
 Postgres on 5432
 

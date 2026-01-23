@@ -4,7 +4,7 @@ import useDashboardStore from '../../store/dashboardStore';
 import BaseWidget from '../Widgets/BaseWidget';
 import GRID_CONFIG from '../../config/gridConfig';
 
-// Fixed canvas dimensions - EXPORTED for use in other components
+// Fixed canvas dimensions
 export const CANVAS_WIDTH = 1366;
 export const CANVAS_HEIGHT = 768;
 
