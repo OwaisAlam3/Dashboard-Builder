@@ -12,7 +12,6 @@ const PROPERTY_PANEL_MAX_WIDTH = 500;
 const PROPERTY_PANEL_DEFAULT_WIDTH = 320;
 const DEFAULT_CANVAS_ZOOM = 0.7;
 
-// Calculate max rows for fixed 1366x768 canvas
 const FIXED_MAX_ROWS = GRID_CONFIG.getMaxRows(768);
 
 const checkStorageQuota = () => {
@@ -30,7 +29,6 @@ const checkStorageQuota = () => {
 const batchedUpdates = (() => {
   let pending = null;
   let timeout = null;
-
   return (fn) => {
     if (timeout) clearTimeout(timeout);
     pending = fn;
@@ -55,7 +53,9 @@ const useDashboardStore = create((set, get) => ({
   dashboards: [],
   dashboardsLoading: false,
   dashboardsError: null,
-  currentDashboard: null, // { id, name, widgets, createdAt, updatedAt }
+  currentDashboard: null,
+  currentDashboardId: null,
+  currentDashboardName: null,
   hasUnsavedChanges: false,
 
   // Template State
@@ -88,34 +88,22 @@ const useDashboardStore = create((set, get) => ({
   historyIndex: -1,
   maxHistory: 50,
 
-  // ==========================================
   // DASHBOARD BACKEND API ACTIONS
-  // ==========================================
-
-  // Fetch all dashboards from backend
   fetchDashboards: async () => {
     set({ dashboardsLoading: true, dashboardsError: null });
     try {
       const response = await fetch(`${API_URL}/dashboards`);
       if (!response.ok) throw new Error('Failed to fetch dashboards');
-      
       const data = await response.json();
-      set({ 
-        dashboards: data, 
-        dashboardsLoading: false 
-      });
+      set({ dashboards: data, dashboardsLoading: false });
       return data;
     } catch (error) {
       console.error('Error fetching dashboards:', error);
-      set({ 
-        dashboardsLoading: false,
-        dashboardsError: error.message 
-      });
+      set({ dashboardsLoading: false, dashboardsError: error.message });
       return [];
     }
   },
 
-  // Create new dashboard in backend
   createDashboard: async (name, widgets = []) => {
     try {
       const response = await fetch(`${API_URL}/dashboards`, {
@@ -123,20 +111,16 @@ const useDashboardStore = create((set, get) => ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, widgets })
       });
-
       if (!response.ok) throw new Error('Failed to create dashboard');
-      
       const dashboard = await response.json();
-      
       set({ 
         currentDashboard: dashboard,
+        currentDashboardId: dashboard.id,
+        currentDashboardName: dashboard.name,
         widgets: dashboard.widgets,
         hasUnsavedChanges: false
       });
-
-      // Refresh dashboard list
       get().fetchDashboards();
-      
       return dashboard;
     } catch (error) {
       console.error('Error creating dashboard:', error);
@@ -144,26 +128,23 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  // Load dashboard from backend
   loadDashboard: async (dashboardId) => {
     try {
       const response = await fetch(`${API_URL}/dashboards/${dashboardId}`);
       if (!response.ok) throw new Error('Dashboard not found');
-      
       const dashboard = await response.json();
-      
       set({ 
         currentDashboard: dashboard,
+        currentDashboardId: dashboard.id,
+        currentDashboardName: dashboard.name,
         widgets: dashboard.widgets || [],
         selectedWidgetIds: [],
         hasUnsavedChanges: false,
         canvasZoom: DEFAULT_CANVAS_ZOOM,
         canvasPan: { x: 0, y: 0 }
       });
-
       get().saveToHistory();
-      get().saveToLocalStorage(); // Keep local backup
-      
+      get().saveToLocalStorage();
       return dashboard;
     } catch (error) {
       console.error('Error loading dashboard:', error);
@@ -171,13 +152,9 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  // Update current dashboard in backend
   updateDashboard: async (updates) => {
     const state = get();
-    if (!state.currentDashboard) {
-      throw new Error('No dashboard loaded');
-    }
-
+    if (!state.currentDashboard) throw new Error('No dashboard loaded');
     try {
       const response = await fetch(`${API_URL}/dashboards/${state.currentDashboard.id}`, {
         method: 'PUT',
@@ -187,19 +164,14 @@ const useDashboardStore = create((set, get) => ({
           widgets: updates.widgets || state.widgets
         })
       });
-
       if (!response.ok) throw new Error('Failed to update dashboard');
-      
       const updatedDashboard = await response.json();
-      
       set({ 
         currentDashboard: updatedDashboard,
+        currentDashboardName: updatedDashboard.name,
         hasUnsavedChanges: false
       });
-
-      // Refresh dashboard list
       get().fetchDashboards();
-      
       return updatedDashboard;
     } catch (error) {
       console.error('Error updating dashboard:', error);
@@ -207,46 +179,35 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  // Save current widgets to backend dashboard
   saveDashboard: async (name) => {
     const state = get();
-    
-    // If no current dashboard, create new one
     if (!state.currentDashboard) {
       return get().createDashboard(name || 'Untitled Dashboard', state.widgets);
     }
-    
-    // Otherwise update existing
     return get().updateDashboard({ 
       name: name || state.currentDashboard.name,
       widgets: state.widgets 
     });
   },
 
-  // Delete dashboard from backend
   deleteDashboard: async (dashboardId) => {
     try {
       const response = await fetch(`${API_URL}/dashboards/${dashboardId}`, {
         method: 'DELETE'
       });
-
       if (!response.ok) throw new Error('Failed to delete dashboard');
-      
       const state = get();
-      
-      // If deleted dashboard is currently loaded, clear it
       if (state.currentDashboard?.id === dashboardId) {
         set({
           currentDashboard: null,
+          currentDashboardId: null,
+          currentDashboardName: null,
           widgets: [],
           selectedWidgetIds: [],
           hasUnsavedChanges: false
         });
       }
-
-      // Refresh dashboard list
       get().fetchDashboards();
-      
       return true;
     } catch (error) {
       console.error('Error deleting dashboard:', error);
@@ -254,32 +215,25 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  // Duplicate dashboard
   duplicateDashboard: async (dashboardId) => {
     try {
       const response = await fetch(`${API_URL}/dashboards/${dashboardId}`);
       if (!response.ok) throw new Error('Dashboard not found');
-      
       const dashboard = await response.json();
-      
-      // Create copy with new name
-      return get().createDashboard(
-        `${dashboard.name} (Copy)`,
-        dashboard.widgets
-      );
+      return get().createDashboard(`${dashboard.name} (Copy)`, dashboard.widgets);
     } catch (error) {
       console.error('Error duplicating dashboard:', error);
       throw error;
     }
   },
 
-  // Mark dashboard as having unsaved changes
   markUnsaved: () => set({ hasUnsavedChanges: true }),
 
-  // Create new blank dashboard (local only until saved)
   createNewDashboard: () => {
     set({
       currentDashboard: null,
+      currentDashboardId: null,
+      currentDashboardName: null,
       widgets: [],
       selectedWidgetIds: [],
       hasUnsavedChanges: false,
@@ -290,88 +244,52 @@ const useDashboardStore = create((set, get) => ({
     });
   },
 
-  // ==========================================
   // TEMPLATE API ACTIONS
-  // ==========================================
-
   fetchTemplates: async () => {
     set({ templatesLoading: true, templatesError: null });
-    
     try {
       const response = await fetch(`${API_URL}/templates`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const data = await response.json();
-      set({ 
-        templates: data, 
-        templatesLoading: false,
-        templatesError: null 
-      });
+      set({ templates: data, templatesLoading: false, templatesError: null });
     } catch (error) {
       console.error('Error fetching templates:', error);
-      set({ 
-        templatesLoading: false,
-        templatesError: error.message || 'Failed to load templates'
-      });
+      set({ templatesLoading: false, templatesError: error.message || 'Failed to load templates' });
     }
   },
 
-  // ==========================================
   // UI ACTIONS
-  // ==========================================
-
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarWidth: (width) => set({ sidebarWidth: Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, width)) }),
   togglePropertyPanel: () => set((state) => ({ propertyPanelOpen: !state.propertyPanelOpen })),
   setPropertyPanelWidth: (width) => set({ propertyPanelWidth: Math.max(PROPERTY_PANEL_MIN_WIDTH, Math.min(PROPERTY_PANEL_MAX_WIDTH, width)) }),
   setShowTemplateSelector: (show) => set({ showTemplateSelector: show }),
 
-  // ==========================================
   // CANVAS ACTIONS
-  // ==========================================
-
   setCanvasZoom: (zoom) => set({ canvasZoom: Math.max(0.25, Math.min(3, zoom)) }),
   setCanvasPan: (pan) => set({ canvasPan: pan }),
   resetCanvasView: () => set({ canvasZoom: DEFAULT_CANVAS_ZOOM, canvasPan: { x: 0, y: 0 } }),
-  
   fitCanvasToScreen: (viewportWidth, viewportHeight) => {
     const zoom = GRID_CONFIG.calculateFitZoom(viewportWidth, viewportHeight);
-    set({ 
-      canvasZoom: zoom,
-      canvasPan: { x: 0, y: 0 }
-    });
+    set({ canvasZoom: zoom, canvasPan: { x: 0, y: 0 } });
   },
-  
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   setCurrentBreakpoint: (breakpoint) => set({ currentBreakpoint: breakpoint }),
   updateGridColumns: (columns) => set({ gridColumns: columns }),
   setMaxRows: (rows) => set({ maxRows: rows }),
 
-  // ==========================================
   // COLLISION DETECTION
-  // ==========================================
-
   checkCollision: (widget, excludeId = null) => {
     try {
       const state = get();
       const { x, y, w, h } = widget.gridArea;
-
       if (x < 0 || y < 0 || w <= 0 || h <= 0) return true;
       if (x + w > state.gridColumns) return true;
       if (y + h > state.maxRows) return true;
-
       return state.widgets.some(w => {
         if (w.id === excludeId) return false;
         const area = w.gridArea;
-        return !(
-          x >= area.x + area.w ||
-          area.x >= x + w ||
-          y >= area.y + area.h ||
-          area.y >= y + h
-        );
+        return !(x >= area.x + area.w || area.x >= x + w || y >= area.y + area.h || area.y >= y + h);
       });
     } catch (error) {
       console.error('Collision check error:', error);
@@ -383,33 +301,26 @@ const useDashboardStore = create((set, get) => ({
     const state = get();
     const maxColumns = state.gridColumns;
     const maxRows = state.maxRows;
-
     for (let y = 0; y <= Math.min(3, maxRows - height); y++) {
       for (let x = 0; x <= maxColumns - width; x++) {
         const testWidget = { gridArea: { x, y, w: width, h: height } };
         if (!state.checkCollision(testWidget)) return { x, y };
       }
     }
-
     for (let y = 0; y <= maxRows - height; y++) {
       for (let x = 0; x <= maxColumns - width; x++) {
         const testWidget = { gridArea: { x, y, w: width, h: height } };
         if (!state.checkCollision(testWidget)) return { x, y };
       }
     }
-
     const maxY = Math.max(...state.widgets.map(w => w.gridArea.y + w.gridArea.h), 0);
     return { x: 0, y: Math.min(maxY, maxRows - height) };
   },
 
-  // ==========================================
   // WIDGET SELECTION
-  // ==========================================
-
   selectWidget: (widgetId, multiSelect = false) => {
     set((state) => {
       const isAlreadySelected = state.selectedWidgetIds.includes(widgetId);
-
       if (multiSelect) {
         return {
           selectedWidgetIds: isAlreadySelected
@@ -418,29 +329,19 @@ const useDashboardStore = create((set, get) => ({
           propertyPanelOpen: true,
         };
       }
-
-      if (isAlreadySelected && state.selectedWidgetIds.length === 1) {
-        return state;
-      }
-
-      return {
-        selectedWidgetIds: [widgetId],
-        propertyPanelOpen: true,
-      };
+      if (isAlreadySelected && state.selectedWidgetIds.length === 1) return state;
+      return { selectedWidgetIds: [widgetId], propertyPanelOpen: true };
     });
   },
 
   deselectAll: () => set({ selectedWidgetIds: [], propertyPanelOpen: false }),
   selectMultiple: (widgetIds) => set({ selectedWidgetIds: widgetIds, propertyPanelOpen: widgetIds.length > 0 }),
   setHoveredWidget: (widgetId) => set({ hoveredWidgetId: widgetId }),
+  clearSelection: () => set({ selectedWidgetIds: [] }),
 
-  // ==========================================
-  // WIDGET CRUD (with unsaved changes tracking)
-  // ==========================================
-
+  // WIDGET CRUD
   addWidget: (widgetType, widgetConfig = {}) => {
     const state = get();
-
     let gridArea = widgetConfig.gridArea;
     if (!gridArea) {
       const defaultWidth = Math.min(widgetType.minW || 6, state.gridColumns);
@@ -448,13 +349,8 @@ const useDashboardStore = create((set, get) => ({
       const position = state.findEmptySpace(defaultWidth, defaultHeight);
       gridArea = { x: position.x, y: position.y, w: defaultWidth, h: defaultHeight };
     }
-
-    if (gridArea.x + gridArea.w > state.gridColumns) {
-      gridArea.w = state.gridColumns - gridArea.x;
-    }
-    if (gridArea.y + gridArea.h > state.maxRows) {
-      gridArea.h = state.maxRows - gridArea.y;
-    }
+    if (gridArea.x + gridArea.w > state.gridColumns) gridArea.w = state.gridColumns - gridArea.x;
+    if (gridArea.y + gridArea.h > state.maxRows) gridArea.h = state.maxRows - gridArea.y;
 
     const newWidget = {
       id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -474,7 +370,6 @@ const useDashboardStore = create((set, get) => ({
       propertyPanelOpen: true,
       hasUnsavedChanges: true
     }));
-
     get().saveToHistory();
     get().saveToLocalStorage();
     return newWidget;
@@ -496,9 +391,7 @@ const useDashboardStore = create((set, get) => ({
     batchedUpdates(() => {
       set((state) => ({
         widgets: state.widgets.map((widget) =>
-          widget.id === widgetId
-            ? { ...widget, data: { ...widget.data, ...dataUpdates } }
-            : widget
+          widget.id === widgetId ? { ...widget, data: { ...widget.data, ...dataUpdates } } : widget
         ),
         hasUnsavedChanges: true
       }));
@@ -510,38 +403,24 @@ const useDashboardStore = create((set, get) => ({
     const state = get();
     const widget = state.widgets.find(w => w.id === widgetId);
     if (!widget) return false;
-
     const maxColumns = state.gridColumns;
     const maxRows = state.maxRows;
-
     const constrainedArea = {
       x: Math.max(0, Math.min(gridArea.x, maxColumns - gridArea.w)),
       y: Math.max(0, Math.min(gridArea.y, maxRows - gridArea.h)),
       w: Math.max(GRID_CONFIG.minWidgetWidth, Math.min(gridArea.w, maxColumns)),
       h: Math.max(GRID_CONFIG.minWidgetHeight, Math.min(gridArea.h, maxRows))
     };
-
-    if (constrainedArea.x + constrainedArea.w > maxColumns) {
-      constrainedArea.w = maxColumns - constrainedArea.x;
-    }
-    if (constrainedArea.y + constrainedArea.h > maxRows) {
-      constrainedArea.h = maxRows - constrainedArea.y;
-    }
-
+    if (constrainedArea.x + constrainedArea.w > maxColumns) constrainedArea.w = maxColumns - constrainedArea.x;
+    if (constrainedArea.y + constrainedArea.h > maxRows) constrainedArea.h = maxRows - constrainedArea.y;
     if (checkCollision) {
       const testWidget = { gridArea: constrainedArea };
-      if (state.checkCollision(testWidget, widgetId)) {
-        return false;
-      }
+      if (state.checkCollision(testWidget, widgetId)) return false;
     }
-
     set((state) => ({
-      widgets: state.widgets.map((w) =>
-        w.id === widgetId ? { ...w, gridArea: constrainedArea } : w
-      ),
+      widgets: state.widgets.map((w) => w.id === widgetId ? { ...w, gridArea: constrainedArea } : w),
       hasUnsavedChanges: true
     }));
-
     return true;
   },
 
@@ -572,7 +451,6 @@ const useDashboardStore = create((set, get) => ({
     const widget = state.widgets.find((w) => w.id === widgetId);
     if (!widget) return;
     const position = state.findEmptySpace(widget.gridArea.w, widget.gridArea.h);
-
     const newWidget = {
       ...widget,
       id: `widget-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -580,13 +458,11 @@ const useDashboardStore = create((set, get) => ({
       zIndex: state.widgets.length,
       data: { ...widget.data },
     };
-
     set((state) => ({
       widgets: [...state.widgets, newWidget],
       selectedWidgetIds: [newWidget.id],
       hasUnsavedChanges: true
     }));
-
     get().saveToHistory();
     get().saveToLocalStorage();
     return newWidget;
@@ -612,10 +488,7 @@ const useDashboardStore = create((set, get) => ({
     get().saveToLocalStorage();
   },
 
-  // ==========================================
   // TEMPLATE MANAGEMENT
-  // ==========================================
-
   loadTemplate: (template) => {
     set({ 
       widgets: [], 
@@ -625,7 +498,6 @@ const useDashboardStore = create((set, get) => ({
       canvasPan: { x: 0, y: 0 },
       hasUnsavedChanges: true
     });
-    
     const newWidgets = template.widgets.map((widgetConfig, index) => ({
       id: `widget-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       type: widgetConfig.type,
@@ -637,29 +509,21 @@ const useDashboardStore = create((set, get) => ({
       zIndex: index,
       data: { ...widgetConfig.data },
     }));
-
     set({ widgets: newWidgets });
-
     get().saveToHistory();
     get().saveToLocalStorage();
   },
 
-  // ==========================================
   // CLIPBOARD OPERATIONS
-  // ==========================================
-
   copySelectedWidgets: () => {
     const state = get();
-    const selectedWidgets = state.widgets.filter((w) =>
-      state.selectedWidgetIds.includes(w.id)
-    );
+    const selectedWidgets = state.widgets.filter((w) => state.selectedWidgetIds.includes(w.id));
     set({ clipboard: selectedWidgets });
   },
 
   pasteWidgets: () => {
     const state = get();
     if (!state.clipboard || state.clipboard.length === 0) return;
-    
     const newWidgets = state.clipboard.map((widget) => {
       const position = state.findEmptySpace(widget.gridArea.w, widget.gridArea.h);
       return {
@@ -670,21 +534,16 @@ const useDashboardStore = create((set, get) => ({
         data: { ...widget.data },
       };
     });
-
     set((state) => ({
       widgets: [...state.widgets, ...newWidgets],
       selectedWidgetIds: newWidgets.map((w) => w.id),
       hasUnsavedChanges: true
     }));
-
     get().saveToHistory();
     get().saveToLocalStorage();
   },
 
-  // ==========================================
   // Z-INDEX MANAGEMENT
-  // ==========================================
-
   bringToFront: (widgetId) => {
     const state = get();
     const maxZIndex = Math.max(...state.widgets.map(w => w.zIndex), 0);
@@ -709,31 +568,18 @@ const useDashboardStore = create((set, get) => ({
     get().saveToLocalStorage();
   },
 
-  // ==========================================
   // INTERACTION STATE
-  // ==========================================
-
   setIsDragging: (isDragging, widgetId = null) => set({ isDragging, draggedWidget: widgetId }),
   setIsResizing: (isResizing) => set({ isResizing }),
   setIsPanning: (isPanning) => set({ isPanning }),
 
-  // ==========================================
   // HISTORY MANAGEMENT
-  // ==========================================
-
   saveToHistory: () => {
     const state = get();
-    const snapshot = {
-      widgets: JSON.parse(JSON.stringify(state.widgets)),
-      timestamp: Date.now(),
-    };
+    const snapshot = { widgets: JSON.parse(JSON.stringify(state.widgets)), timestamp: Date.now() };
     const newHistory = state.history.slice(0, state.historyIndex + 1);
     newHistory.push(snapshot);
-
-    if (newHistory.length > state.maxHistory) {
-      newHistory.shift();
-    }
-
+    if (newHistory.length > state.maxHistory) newHistory.shift();
     set({ history: newHistory, historyIndex: newHistory.length - 1 });
   },
 
@@ -767,10 +613,7 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  // ==========================================
   // LOCAL STORAGE (Backup/Draft)
-  // ==========================================
-
   saveToLocalStorage: () => {
     if (!checkStorageQuota()) {
       console.warn('Storage unavailable, skipping save');
@@ -787,14 +630,11 @@ const useDashboardStore = create((set, get) => ({
         propertyPanelWidth: state.propertyPanelWidth,
         version: '5.0.0',
       };
-
       const serialized = JSON.stringify(saveData);
-
       if (serialized.length > 5 * 1024 * 1024) {
         console.warn('Data too large for localStorage');
         return false;
       }
-
       localStorage.setItem('figma-dashboard-grid', serialized);
       return true;
     } catch (error) {
@@ -824,10 +664,7 @@ const useDashboardStore = create((set, get) => ({
               sidebarWidth: data.sidebarWidth || SIDEBAR_DEFAULT_WIDTH,
               propertyPanelWidth: data.propertyPanelWidth || PROPERTY_PANEL_DEFAULT_WIDTH,
             });
-
-            if (data.widgets && data.widgets.length > 0) {
-              get().saveToHistory();
-            }
+            if (data.widgets && data.widgets.length > 0) get().saveToHistory();
           } else {
             set({ showTemplateSelector: true }); 
           }
@@ -847,6 +684,9 @@ const useDashboardStore = create((set, get) => ({
     set({
       widgets: [],
       selectedWidgetIds: [],
+      currentDashboard: null,
+      currentDashboardId: null,
+      currentDashboardName: null,
       history: [],
       historyIndex: -1,
       canvasZoom: DEFAULT_CANVAS_ZOOM,
@@ -860,25 +700,21 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
+  // IMPORT/EXPORT
   exportDashboard: () => {
     const state = get();
     return {
       version: '5.0.0',
-      name: state.currentDashboard?.name || 'Untitled Dashboard',
-      widgets: state.widgets,
-      settings: {
-        showGrid: state.showGrid,
-        gridColumns: state.gridColumns,
-      },
       canvasSize: { width: 1366, height: 768 },
       timestamp: new Date().toISOString(),
+      name: state.currentDashboard?.name || 'Untitled Dashboard',
+      widgets: state.widgets,
+      settings: { showGrid: state.showGrid, gridColumns: state.gridColumns, maxRows: state.maxRows },
     };
   },
 
   importDashboard: (data) => {
-    if (!data || !data.widgets) {
-      throw new Error('Invalid dashboard data');
-    }
+    if (!data || !data.widgets) throw new Error('Invalid dashboard data');
     set({
       widgets: data.widgets,
       selectedWidgetIds: [],
@@ -886,8 +722,8 @@ const useDashboardStore = create((set, get) => ({
       canvasZoom: DEFAULT_CANVAS_ZOOM,
       canvasPan: { x: 0, y: 0 },
       gridColumns: 24,
+      hasUnsavedChanges: true
     });
-
     get().saveToHistory();
     get().saveToLocalStorage();
   },

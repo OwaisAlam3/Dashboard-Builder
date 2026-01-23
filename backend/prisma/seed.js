@@ -1,3 +1,4 @@
+// backend/prisma/seed.js
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();

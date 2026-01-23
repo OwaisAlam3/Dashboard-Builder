@@ -1,8 +1,10 @@
-// src/components/Dashboard/DashboardLayout.jsx - Complete with Fit-to-Screen
+// src/components/Dashboard/DashboardLayout.jsx
+import { useNavigate } from 'react-router-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Menu, Save, Download, Upload, Trash2, Grid, ZoomIn, ZoomOut,
-  Maximize2, Minimize2, Undo2, Redo2, Copy, Clipboard, Check, Sparkles, AlertCircle
+  Maximize2, Minimize2, Undo2, Redo2, Copy, Clipboard, Check, 
+  Sparkles, AlertCircle, Clock, Home
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import { usePersistentLayout } from '../../hooks/usePersistentLayout';
@@ -10,8 +12,10 @@ import WidgetSidebar from './WidgetSidebar';
 import GridCanvas from './GridCanvas';
 import PropertyPanel from './PropertyPanel';
 import TemplateSelector from '../Templates/TemplateSelector';
+import RecentDashboardsPopover from './RecentDashboardsPopover';
 
 const DashboardLayout = () => {
+  const navigate = useNavigate();
   const {
     sidebarOpen, sidebarWidth, setSidebarWidth,
     propertyPanelOpen, propertyPanelWidth, setPropertyPanelWidth,
@@ -21,6 +25,7 @@ const DashboardLayout = () => {
     undo, redo, historyIndex, history,
     copySelectedWidgets, pasteWidgets, selectedWidgetIds,
     showTemplateSelector, setShowTemplateSelector,
+    currentDashboardId, currentDashboardName,
   } = useDashboardStore();
 
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
@@ -28,9 +33,12 @@ const DashboardLayout = () => {
   const [saveIndicator, setSaveIndicator] = useState(false);
   const [error, setError] = useState(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [showRecentDashboards, setShowRecentDashboards] = useState(false);
+  
   const sidebarDividerRef = useRef(null);
   const propertyDividerRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const recentButtonRef = useRef(null);
 
   usePersistentLayout();
 
@@ -108,49 +116,42 @@ const DashboardLayout = () => {
     const handleKeyDown = (e) => {
       const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
       
-      // Save
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault();
         handleSave();
         return;
       }
       
-      // Undo
       if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
         return;
       }
       
-      // Redo
       if ((e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) {
         e.preventDefault();
         redo();
         return;
       }
       
-      // Copy (only when not typing)
       if ((e.metaKey || e.ctrlKey) && e.key === 'c' && selectedWidgetIds.length > 0 && !isTyping) {
         e.preventDefault();
         copySelectedWidgets();
         return;
       }
       
-      // Paste (only when not typing)
       if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !isTyping) {
         e.preventDefault();
         pasteWidgets();
         return;
       }
       
-      // Delete (only when not typing)
       if (e.key === 'Delete' && selectedWidgetIds.length > 0 && !isTyping) {
         e.preventDefault();
         useDashboardStore.getState().deleteSelectedWidgets();
         return;
       }
       
-      // Toggle Grid
       if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
         e.preventDefault();
         toggleGrid();
@@ -162,12 +163,10 @@ const DashboardLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, copySelectedWidgets, pasteWidgets, selectedWidgetIds, toggleGrid]);
 
-  // Save with proper timeout cleanup
   const handleSave = () => {
     try {
       saveToLocalStorage();
       
-      // Clear previous timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
@@ -183,7 +182,6 @@ const DashboardLayout = () => {
     }
   };
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
@@ -209,7 +207,6 @@ const DashboardLayout = () => {
     }
   };
 
-  // Import with detailed error handling
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -222,7 +219,6 @@ const DashboardLayout = () => {
           try {
             const data = JSON.parse(e.target.result);
             
-            // Validate data structure
             if (!data.widgets || !Array.isArray(data.widgets)) {
               throw new Error('Invalid dashboard format: missing widgets array');
             }
@@ -267,15 +263,29 @@ const DashboardLayout = () => {
 
   const handleNewDashboard = () => {
     if (confirm('Create new dashboard? Current work will be saved.')) {
-      saveToLocalStorage();
-      clearDashboard();
+      handleSave();
       setShowTemplateSelector(true);
+    }
+  };
+
+  const handleGoHome = () => {
+    if (confirm('Return to dashboard home? Current work will be saved.')) {
+      handleSave();
+      navigate('/');
     }
   };
 
   return (
     <div className="flex flex-col h-screen bg-canvas text-white overflow-hidden">
       {showTemplateSelector && <TemplateSelector />}
+
+      {/* Recent Dashboards Popover */}
+      {showRecentDashboards && (
+        <RecentDashboardsPopover
+          anchorRef={recentButtonRef}
+          onClose={() => setShowRecentDashboards(false)}
+        />
+      )}
 
       {/* Error Toast */}
       {error && (
@@ -287,12 +297,33 @@ const DashboardLayout = () => {
 
       <header className="h-12 bg-panel border-b border-panel-border flex items-center justify-between px-3 no-print z-50">
         <div className="flex items-center gap-2">
+          <button onClick={handleGoHome}
+            className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Dashboard Home">
+            <Home size={18} />
+          </button>
+          
           <button onClick={toggleSidebar}
             className="p-1.5 hover:bg-panel-light rounded transition-colors" title="Toggle Sidebar">
             <Menu size={18} />
           </button>
           
           <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          {/* Current Dashboard Name */}
+          <div className="px-3 py-1 bg-panel-light rounded text-sm font-medium text-white/80">
+            {currentDashboardName || 'Untitled Dashboard'}
+          </div>
+          
+          <div className="w-px h-6 bg-panel-border mx-1" />
+          
+          <button
+            ref={recentButtonRef}
+            onClick={() => setShowRecentDashboards(!showRecentDashboards)}
+            className="px-3 py-1.5 hover:bg-panel-light rounded transition-colors flex items-center gap-2"
+            title="Recent Dashboards">
+            <Clock size={16} />
+            <span className="text-sm hidden sm:inline">Recent</span>
+          </button>
           
           <button onClick={handleNewDashboard}
             className="px-3 py-1.5 hover:bg-panel-light rounded transition-colors flex items-center gap-2" title="New Dashboard">

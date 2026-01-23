@@ -1,21 +1,31 @@
-// src/App.jsx
-import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import DashboardHome from './components/Home/DashboardHome';
 import DashboardLayout from './components/Dashboard/DashboardLayout';
-import useDashboardStore from './store/dashboardStore';
 
-function App() {
-  const { loadFromLocalStorage } = useDashboardStore();
+function AppRoutes() {
+  const navigate = useNavigate(); // ✅ hook at top level ONLY
 
-  useEffect(() => {
-    // Load saved dashboard on mount
-    loadFromLocalStorage();
-  }, [loadFromLocalStorage]);
+  function onOpenDashboard(id) {
+    navigate(`/dashboard/${id}`); // ✅ normal function call
+  }
 
   return (
-    <div className="w-full h-screen bg-gray-50">
-      <DashboardLayout />
-    </div>
+    <Routes>
+      <Route
+        path="/"
+        element={<DashboardHome onOpenDashboard={onOpenDashboard} />}
+      />
+      <Route path="/dashboard/:id" element={<DashboardLayout />} />
+    </Routes>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
+}
+
+
