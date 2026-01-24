@@ -1,4 +1,4 @@
-// src/components/Dashboard/DashboardHome.jsx
+// src/components/Home/DashboardHome.jsx - FIXED: Direct navigation
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -105,8 +105,9 @@ const DashboardHome = () => {
     e.stopPropagation();
     setActionLoading(dashboardId);
     try {
-      await duplicateDashboard(dashboardId);
+      const newDashboard = await duplicateDashboard(dashboardId);
       await fetchDashboards();
+      navigate(`/dashboard/${newDashboard.id}`);
     } catch (error) {
       console.error('Error duplicating dashboard:', error);
     } finally {

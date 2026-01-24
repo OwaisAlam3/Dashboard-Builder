@@ -6,22 +6,22 @@ import useDashboardStore from '../../store/dashboardStore';
 import DashboardLayout from './DashboardLayout';
 
 const DashboardLoader = () => {
-  const { dashboardId } = useParams();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const { loadDashboard, currentDashboardId, clearDashboard } = useDashboardStore();
+  const { loadDashboard, currentDashboardId } = useDashboardStore();
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const initDashboard = async () => {
-      if (!dashboardId) {
+      if (!id) {
         navigate('/');
         return;
       }
 
-      // If already loaded, skip
-      if (currentDashboardId === dashboardId) {
+      // If already loaded with same ID, skip
+      if (currentDashboardId === id) {
         setLoading(false);
         return;
       }
@@ -30,11 +30,7 @@ const DashboardLoader = () => {
       setError(null);
 
       try {
-        // Clear previous dashboard state
-        clearDashboard();
-        
-        // Load new dashboard
-        await loadDashboard(dashboardId);
+        await loadDashboard(id);
         setLoading(false);
       } catch (err) {
         console.error('Failed to load dashboard:', err);
@@ -44,7 +40,7 @@ const DashboardLoader = () => {
     };
 
     initDashboard();
-  }, [dashboardId, currentDashboardId, loadDashboard, clearDashboard, navigate]);
+  }, [id, currentDashboardId, loadDashboard, navigate]);
 
   if (loading) {
     return (

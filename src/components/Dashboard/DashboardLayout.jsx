@@ -1,13 +1,12 @@
-// src/components/Dashboard/DashboardLayout.jsx
+// src/components/Dashboard/DashboardLayout.jsx - FIXED: Auto-save integration
 import { useNavigate } from 'react-router-dom';
 import React, { useEffect, useState, useRef } from 'react';
 import { 
   Menu, Save, Download, Upload, Trash2, Grid, ZoomIn, ZoomOut,
   Maximize2, Minimize2, Undo2, Redo2, Copy, Clipboard, Check, 
-  Sparkles, AlertCircle, Clock, Home
+  Sparkles, AlertCircle, Clock, Home, Loader2
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
-import { usePersistentLayout } from '../../hooks/usePersistentLayout';
 import WidgetSidebar from './WidgetSidebar';
 import GridCanvas from './GridCanvas';
 import PropertyPanel from './PropertyPanel';
@@ -21,26 +20,23 @@ const DashboardLayout = () => {
     propertyPanelOpen, propertyPanelWidth, setPropertyPanelWidth,
     toggleSidebar, showGrid, toggleGrid,
     canvasZoom, setCanvasZoom, resetCanvasView, fitCanvasToScreen,
-    clearDashboard, saveToLocalStorage, exportDashboard, importDashboard,
+    clearDashboard, saveDashboard, exportDashboard, importDashboard,
     undo, redo, historyIndex, history,
     copySelectedWidgets, pasteWidgets, selectedWidgetIds,
     showTemplateSelector, setShowTemplateSelector,
     currentDashboardId, currentDashboardName,
+    isSaving, lastSaved, hasUnsavedChanges,
   } = useDashboardStore();
 
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isResizingProperty, setIsResizingProperty] = useState(false);
-  const [saveIndicator, setSaveIndicator] = useState(false);
   const [error, setError] = useState(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [showRecentDashboards, setShowRecentDashboards] = useState(false);
   
   const sidebarDividerRef = useRef(null);
   const propertyDividerRef = useRef(null);
-  const saveTimeoutRef = useRef(null);
   const recentButtonRef = useRef(null);
-
-  usePersistentLayout();
 
   // Track viewport size for fit-to-screen
   useEffect(() => {
@@ -111,7 +107,16 @@ const DashboardLayout = () => {
     };
   }, [isResizingProperty, setPropertyPanelWidth]);
 
-  // Keyboard shortcuts with proper preventDefault
+  // Save on unmount
+  useEffect(() => {
+    return () => {
+      if (hasUnsavedChanges && currentDashboardId) {
+        saveDashboard();
+      }
+    };
+  }, [hasUnsavedChanges, currentDashboardId, saveDashboard]);
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       const isTyping = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
@@ -163,32 +168,15 @@ const DashboardLayout = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo, copySelectedWidgets, pasteWidgets, selectedWidgetIds, toggleGrid]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      saveToLocalStorage();
-      
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-      
-      setSaveIndicator(true);
-      saveTimeoutRef.current = setTimeout(() => {
-        setSaveIndicator(false);
-      }, 2000);
+      await saveDashboard();
     } catch (error) {
       console.error('Save error:', error);
       setError('Failed to save dashboard');
       setTimeout(() => setError(null), 3000);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleExport = () => {
     try {
@@ -218,15 +206,6 @@ const DashboardLayout = () => {
         reader.onload = (e) => {
           try {
             const data = JSON.parse(e.target.result);
-            
-            if (!data.widgets || !Array.isArray(data.widgets)) {
-              throw new Error('Invalid dashboard format: missing widgets array');
-            }
-            
-            if (!data.version) {
-              throw new Error('Invalid dashboard format: missing version');
-            }
-            
             importDashboard(data);
             setError(null);
           } catch (error) {
@@ -263,14 +242,18 @@ const DashboardLayout = () => {
 
   const handleNewDashboard = () => {
     if (confirm('Create new dashboard? Current work will be saved.')) {
-      handleSave();
+      saveDashboard();
       setShowTemplateSelector(true);
     }
   };
 
-  const handleGoHome = () => {
-    if (confirm('Return to dashboard home? Current work will be saved.')) {
-      handleSave();
+  const handleGoHome = async () => {
+    if (hasUnsavedChanges) {
+      if (confirm('Return to dashboard home? Unsaved changes will be saved.')) {
+        await saveDashboard();
+        navigate('/');
+      }
+    } else {
       navigate('/');
     }
   };
@@ -279,7 +262,6 @@ const DashboardLayout = () => {
     <div className="flex flex-col h-screen bg-canvas text-white overflow-hidden">
       {showTemplateSelector && <TemplateSelector />}
 
-      {/* Recent Dashboards Popover */}
       {showRecentDashboards && (
         <RecentDashboardsPopover
           anchorRef={recentButtonRef}
@@ -287,7 +269,6 @@ const DashboardLayout = () => {
         />
       )}
 
-      {/* Error Toast */}
       {error && (
         <div className="fixed top-4 right-4 z-[9999] bg-red-500/90 backdrop-blur-sm text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slideIn">
           <AlertCircle size={18} />
@@ -309,10 +290,29 @@ const DashboardLayout = () => {
           
           <div className="w-px h-6 bg-panel-border mx-1" />
           
-          {/* Current Dashboard Name */}
           <div className="px-3 py-1 bg-panel-light rounded text-sm font-medium text-white/80">
             {currentDashboardName || 'Untitled Dashboard'}
           </div>
+          
+          {(isSaving || hasUnsavedChanges) && (
+            <div className="flex items-center gap-2 text-xs text-white/50">
+              {isSaving ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : hasUnsavedChanges ? (
+                <span>Unsaved changes</span>
+              ) : null}
+            </div>
+          )}
+          
+          {lastSaved && !isSaving && !hasUnsavedChanges && (
+            <div className="text-xs text-green-400 flex items-center gap-1">
+              <Check size={14} />
+              <span>Saved</span>
+            </div>
+          )}
           
           <div className="w-px h-6 bg-panel-border mx-1" />
           
@@ -388,11 +388,11 @@ const DashboardLayout = () => {
           <div className="w-px h-6 bg-panel-border mx-1" />
           
           <button onClick={handleSave}
-            className={`px-3 py-1.5 rounded transition-all flex items-center gap-2 ${
-              saveIndicator ? 'bg-green-600 text-white' : 'hover:bg-panel-light'
-            }`} title="Save (Cmd+S)">
-            {saveIndicator ? (
-              <><Check size={16} /><span className="text-sm hidden sm:inline">Saved!</span></>
+            disabled={isSaving || !hasUnsavedChanges}
+            className="px-3 py-1.5 rounded transition-all flex items-center gap-2 hover:bg-panel-light disabled:opacity-50"
+            title="Save (Cmd+S)">
+            {isSaving ? (
+              <><Loader2 size={16} className="animate-spin" /><span className="text-sm hidden sm:inline">Saving...</span></>
             ) : (
               <><Save size={16} /><span className="text-sm hidden sm:inline">Save</span></>
             )}

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: dashboard_postgres
+    container_name: dashboard-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres

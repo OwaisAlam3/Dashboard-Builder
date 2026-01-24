@@ -8,11 +8,14 @@ datasource db {
 }
 
 model Dashboard {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(cuid())
   name      String
   widgets   Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([updatedAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Template {
@@ -21,7 +24,10 @@ model Template {
   description String?
   category    String
   thumbnail   String?
+  icon        String?
   widgets     Json
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([category])
 }

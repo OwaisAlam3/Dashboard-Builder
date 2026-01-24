@@ -1,31 +1,25 @@
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
 import DashboardHome from './components/Home/DashboardHome';
-import DashboardLayout from './components/Dashboard/DashboardLayout';
+import DashboardLoader from './components/Dashboard/DashboardLoader';
+import useDashboardStore from './store/dashboardStore';
 
-function AppRoutes() {
-  const navigate = useNavigate(); // ✅ hook at top level ONLY
+function App() {
+  const initializeApp = useDashboardStore((state) => state.initializeApp);
 
-  function onOpenDashboard(id) {
-    navigate(`/dashboard/${id}`); // ✅ normal function call
-  }
+  useEffect(() => {
+    // Initialize app on mount
+    initializeApp();
+  }, [initializeApp]);
 
-  return (
-    <Routes>
-      <Route
-        path="/"
-        element={<DashboardHome onOpenDashboard={onOpenDashboard} />}
-      />
-      <Route path="/dashboard/:id" element={<DashboardLayout />} />
-    </Routes>
-  );
-}
-
-export default function App() {
   return (
     <BrowserRouter>
-      <AppRoutes />
+      <Routes>
+        <Route path="/" element={<DashboardHome />} />
+        <Route path="/dashboard/:id" element={<DashboardLoader />} />
+      </Routes>
     </BrowserRouter>
   );
 }
 
-
+export default App;
