@@ -1,0 +1,61 @@
+docker compose up --build
+
+
+Terminal 1 – Backend
+docker run -it --rm -p 4000:4000 -v "%cd%":/app -w /app node:24-bullseye sh
+npm install
+node server.js
+
+Terminal 2 – Frontend
+docker run -it --rm -p 5173:5173 -v "%cd%":/app -w /app node:24-bullseye sh
+npm install
+npm run dev
+
+creating Backend:
+
+ORM(Prisma)
+
+npm init -y
+npm install prisma @prisma/client (npm install prisma@4.18.1 @prisma/client@4.18.1) using downgraded version
+npx prisma init
+
+PRSIMA STUDIO:
+docker compose exec backend npx prisma studio
+
+
+npx prisma migrate dev --name init
+
+postgre container
+
+docker run --name dashboard-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=dashboarddb -p 5432:5432 -d postgres:15
+
+----------------------------------------------------------------------------------------------
+FLOW:
+Start PostgreSQL container (only once if already running):
+docker start dashboard-postgres
+
+Go to project root and start Node container:
+docker run -it --rm -p 5173:5173 -p 4000:4000 -v "%cd%":/app -w /app node:24-bullseye sh
+
+Go to backend and install deps (only if node_modules missing):
+cd backend && npm install
+
+Start backend server:
+node server.js
+
+Open a second terminal, start frontend (Vite):
+npm run dev
+
+
+npx prisma db push
+npx prisma generate
+node prisma/seed.js
+
+
+
+
+Postgres on 5432
+
+Backend on 4000
+
+Frontend on 5173

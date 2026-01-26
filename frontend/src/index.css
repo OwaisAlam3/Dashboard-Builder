@@ -1,0 +1,479 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Variables for theming */
+:root {
+  --canvas-bg: #18191B;
+  --panel-bg: #2C2D30;
+  --border-color: #4D4D4D;
+  --text-primary: #FFFFFF;
+  --text-secondary: #B4B4B4;
+  --accent-blue: #0D99FF;
+}
+
+/* Custom Cursors */
+.cursor-canvas-default {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><path fill="white" stroke="black" stroke-width="1" d="M2 2 L2 16 L6 12 L9 18 L11 17 L8 11 L14 11 Z"/></svg>') 2 2, auto;
+}
+
+.cursor-grab {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="white" stroke="black" stroke-width="1" d="M12 2c-1.1 0-2 .9-2 2v8h-2V6c0-1.1-.9-2-2-2s-2 .9-2 2v10c0 3.3 2.7 6 6 6h4c3.3 0 6-2.7 6-6V8c0-1.1-.9-2-2-2s-2 .9-2 2v6h-2V4c0-1.1-.9-2-2-2z"/></svg>') 12 12, grab;
+}
+
+.cursor-grabbing {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="white" stroke="black" stroke-width="1" d="M20 8c0-1.1-.9-2-2-2h-1V4c0-1.1-.9-2-2-2s-2 .9-2 2v2h-2V2c0-1.1-.9-2-2-2S7 .9 7 2v4H6c-1.1 0-2 .9-2 2v10c0 3.3 2.7 6 6 6h4c3.3 0 6-2.7 6-6V8z"/></svg>') 12 12, grabbing;
+}
+
+.cursor-resize-ew {
+  cursor: ew-resize;
+}
+
+.cursor-resize-ns {
+  cursor: ns-resize;
+}
+
+.cursor-resize-nwse {
+  cursor: nwse-resize;
+}
+
+.cursor-resize-nesw {
+  cursor: nesw-resize;
+}
+
+/* Reset & Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--canvas-bg);
+  color: var(--text-primary);
+}
+
+/* Custom Scrollbar - Figma Style */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Selection Styles */
+::selection {
+  background-color: rgba(13, 153, 255, 0.3);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: rgba(13, 153, 255, 0.3);
+  color: white;
+}
+
+/* Focus Styles */
+*:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+/* Disable focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Text Selection */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* GPU Acceleration */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  will-change: transform;
+}
+
+/* Canvas Grid */
+.canvas-grid {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0;
+}
+
+/* Resize Handle Styles */
+.resize-handle {
+  position: absolute;
+  z-index: 100;
+  transition: opacity 0.15s ease; /* IMPROVED: Smoother handle appearance */
+}
+
+.resize-handle-n {
+  top: -4px;
+  left: 4px;
+  right: 4px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-handle-s {
+  bottom: -4px;
+  left: 4px;
+  right: 4px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.resize-handle-e {
+  right: -4px;
+  top: 4px;
+  bottom: 4px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-handle-w {
+  left: -4px;
+  top: 4px;
+  bottom: 4px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.resize-handle-ne {
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+  border-radius: 2px; /* IMPROVED: Slight rounding for better visual */
+}
+
+.resize-handle-nw {
+  top: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  border-radius: 2px;
+}
+
+.resize-handle-se {
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+  border-radius: 2px;
+}
+
+.resize-handle-sw {
+  bottom: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+  border-radius: 2px;
+}
+
+/* Floating Toolbar */
+.floating-toolbar {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* IMPROVED: Better depth */
+}
+
+/* Panel Resize Divider */
+.panel-divider {
+  position: relative;
+  width: 1px;
+  background: var(--border-color);
+  cursor: ew-resize;
+  transition: background-color 0.2s;
+  z-index: 50;
+}
+
+.panel-divider:hover,
+.panel-divider:active {
+  background: var(--accent-blue);
+}
+
+.panel-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
+/* Animations */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  animation: shimmer 2s infinite linear;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 1000px 100%;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slideIn {
+  animation: slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Widget States */
+.widget-idle {
+  transition: box-shadow 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.widget-hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(13, 153, 255, 0.5);
+}
+
+.widget-selected {
+  box-shadow: 0 0 0 2px #0D99FF, 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.widget-dragging {
+  opacity: 0.8;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  cursor: grabbing !important;
+}
+
+/* IMPROVED: Better drag prevention */
+.is-dragging,
+.is-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  pointer-events: none !important;
+  cursor: grabbing !important; /* Force grabbing cursor */
+}
+
+.is-dragging .widget-content * {
+  pointer-events: auto !important;
+}
+
+/* IMPROVED: Input focus states for better UX */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(13, 153, 255, 0.1);
+}
+
+/* IMPROVED: Button states */
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Performance optimizations */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-contents {
+  will-change: contents;
+}
+
+/* Scrollbar hide utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Shadow utilities */
+.shadow-widget {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.shadow-figma {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Tailwind Color Extensions */
+.bg-panel {
+  background-color: #2C2D30;
+}
+
+.bg-panel-light {
+  background-color: #3A3B3E;
+}
+
+.bg-panel-lighter {
+  background-color: #45464A;
+}
+
+.bg-canvas {
+  background-color: #18191B;
+}
+
+.border-panel-border {
+  border-color: #4D4D4D;
+}
+
+.text-text-secondary {
+  color: #B4B4B4;
+}
+
+.text-accent-blue {
+  color: #0D99FF;
+}
+
+.bg-accent-blue {
+  background-color: #0D99FF;
+}
+
+.border-accent-blue {
+  border-color: #0D99FF;
+}
+
+/* IMPROVED: Smooth transitions for interactive elements */
+button,
+a,
+input,
+select,
+textarea {
+  transition: all 0.15s ease;
+}
+
+/* IMPROVED: Better loading states */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .resize-handle {
+    border: 2px solid white;
+  }
+  
+  .widget-selected {
+    outline: 3px solid white;
+  }
+}
