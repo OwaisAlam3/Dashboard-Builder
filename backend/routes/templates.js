@@ -19,6 +19,7 @@ router.get('/', async (req, res, next) => {
     
     res.json(templates);
   } catch (error) {
+    console.error('Error fetching templates:', error);
     next(error);
   }
 });
@@ -38,6 +39,7 @@ router.get('/:id', async (req, res, next) => {
 
     res.json(template);
   } catch (error) {
+    console.error('Error fetching template:', error);
     next(error);
   }
 });

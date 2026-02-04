@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Menu, Maximize2, ZoomIn, ZoomOut, Grid as GridIcon, Save, Home, Undo2, Redo2,
   Trash2, Clock, Settings, Check, Loader2, ChevronDown, Edit2, X, Download,
-  Upload, Copy, Clipboard, Sparkles, AlertCircle, MinusSquare, RefreshCw
+  Upload, Copy, Clipboard, Sparkles, AlertCircle, MinusSquare, RefreshCw, Code
 } from 'lucide-react';
 import useDashboardStore from '../../store/dashboardStore';
 import GridCanvas from './GridCanvas';
@@ -12,6 +12,7 @@ import WidgetSidebar from './WidgetSidebar';
 import PropertyPanel from './PropertyPanel';
 import TemplateSelector from '../Templates/TemplateSelector';
 import RecentDashboardsPopover from './RecentDashboardsPopover';
+import EmbedManager from './EmbedManager';
 
 const DashboardLayout = () => {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ const DashboardLayout = () => {
     canvasZoom, setCanvasZoom, resetCanvasView, fitCanvasToScreen,
     showGrid, toggleGrid,
     showTemplateSelector, setShowTemplateSelector,
-    currentDashboardName, updateDashboardName,
+    currentDashboardName, currentDashboardId, updateDashboardName,
     saveDashboard, exportDashboard, importDashboard,
     isSaving, lastSaved, hasUnsavedChanges,
     history, historyIndex, undo, redo,
@@ -42,6 +43,9 @@ const DashboardLayout = () => {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isResizingProperty, setIsResizingProperty] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [showEmbedManager, setShowEmbedManager] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportButtonRef = useRef(null);
 
   // Update edited name when dashboard changes
   useEffect(() => {
@@ -74,6 +78,20 @@ const DashboardLayout = () => {
       return () => clearTimeout(timer);
     }
   }, [notification]);
+
+  // Close export menu when clicking outside
+  useEffect(() => {
+    if (!showExportMenu) return;
+
+    const handleClickOutside = (e) => {
+      if (exportButtonRef.current && !exportButtonRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showExportMenu]);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -336,6 +354,70 @@ const DashboardLayout = () => {
     }
   };
 
+  const handleExportToPDF = async () => {
+    try {
+      showNotification('Generating PDF...', 'info');
+      
+      // Dynamically import libraries
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      
+      // Get the canvas element
+      const canvasElement = document.querySelector('.grid-container');
+      if (!canvasElement) {
+        throw new Error('Canvas not found');
+      }
+
+      // Temporarily hide selection overlays and UI elements
+      const selections = document.querySelectorAll('.selection-overlay, .resize-handle');
+      selections.forEach(el => el.style.display = 'none');
+
+      // Calculate dimensions to fit the dashboard content
+      const widgetElements = canvasElement.querySelectorAll('[data-widget-id]');
+      let maxX = 0, maxY = 0;
+      widgetElements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        const canvasRect = canvasElement.getBoundingClientRect();
+        maxX = Math.max(maxX, rect.right - canvasRect.left);
+        maxY = Math.max(maxY, rect.bottom - canvasRect.top);
+      });
+
+      // Add some padding
+      const captureWidth = Math.max(maxX + 40, 800);
+      const captureHeight = Math.max(maxY + 40, 600);
+
+      // Capture the canvas
+      const canvas = await html2canvas(canvasElement, {
+        backgroundColor: '#0f1419',
+        scale: 2, // Higher quality
+        width: captureWidth,
+        height: captureHeight,
+        windowWidth: captureWidth,
+        windowHeight: captureHeight,
+        logging: false,
+      });
+
+      // Restore hidden elements
+      selections.forEach(el => el.style.display = '');
+
+      // Create PDF
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: captureWidth > captureHeight ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [captureWidth, captureHeight],
+      });
+
+      pdf.addImage(imgData, 'PNG', 0, 0, captureWidth, captureHeight);
+      pdf.save(`${currentDashboardName || 'dashboard'}-${Date.now()}.pdf`);
+      
+      showNotification('PDF exported successfully');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      showNotification('Failed to export PDF', 'error');
+    }
+  };
+
   const handleImport = () => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -569,6 +651,43 @@ const DashboardLayout = () => {
             <span className="text-white/70 hidden sm:inline">New</span>
           </button>
 
+          <div className="relative" ref={exportButtonRef}>
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              className="flex items-center gap-1.5 px-2 py-1.5 hover:bg-panel-light rounded text-xs"
+              title="Export"
+            >
+              <Download size={14} className="text-white/70" />
+              <span className="text-white/70 hidden sm:inline">Export</span>
+              <ChevronDown size={12} className="text-white/70" />
+            </button>
+            
+            {showExportMenu && (
+              <div className="absolute top-full right-0 mt-1 w-40 bg-panel-dark border border-panel-border rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={() => {
+                    handleExport();
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-white/80 hover:bg-panel-light flex items-center gap-2 transition-colors"
+                >
+                  <Download size={14} />
+                  <span>Export as JSON</span>
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportToPDF();
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left text-xs text-white/80 hover:bg-panel-light flex items-center gap-2 transition-colors"
+                >
+                  <Download size={14} />
+                  <span>Export as PDF</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="w-px h-4 bg-panel-border" />
 
           <button
@@ -578,6 +697,15 @@ const DashboardLayout = () => {
           >
             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             <span>Save</span>
+          </button>
+
+          <button
+            onClick={() => setShowEmbedManager(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-panel-light hover:bg-panel-lighter rounded text-xs font-medium"
+            title="Embed"
+          >
+            <Code size={14} className="text-white/70" />
+            <span className="text-white/70">Embed</span>
           </button>
 
           <button
@@ -640,6 +768,14 @@ const DashboardLayout = () => {
 
       {/* Template Selector Modal */}
       {showTemplateSelector && <TemplateSelector />}
+
+      {/* Embed Manager Modal */}
+      {showEmbedManager && (
+        <EmbedManager
+          dashboardId={currentDashboardId}
+          onClose={() => setShowEmbedManager(false)}
+        />
+      )}
     </div>
   );
 };

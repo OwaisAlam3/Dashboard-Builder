@@ -1,4 +1,4 @@
-// src/store/dashboardStore.js - PRODUCTION READY: Fixed Selection, Autosave, Navigation
+// src/store/dashboardStore.js - FIXED: NO COLLISION DETECTION - Free widget placement
 import { create } from 'zustand';
 import GRID_CONFIG from '../config/gridConfig';
 
@@ -126,14 +126,19 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  loadDashboard: async (dashboardId) => {
+  loadDashboard: async (dashboardId, embedToken = null) => {
     if (!dashboardId) {
       console.error('loadDashboard: No dashboard ID provided');
       return null;
     }
 
     try {
-      const response = await fetch(`${API_URL}/dashboards/${dashboardId}`);
+      const headers = {};
+      if (embedToken) {
+        headers['X-Embed-Token'] = embedToken;
+      }
+
+      const response = await fetch(`${API_URL}/dashboards/${dashboardId}`, { headers });
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error('Dashboard not found');
@@ -165,12 +170,12 @@ const useDashboardStore = create((set, get) => ({
     }
   },
 
-  createDashboard: async (name, widgets = []) => {
+  createDashboard: async (name, widgets = [], isPublic = false) => {
     try {
       const response = await fetch(`${API_URL}/dashboards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, widgets })
+        body: JSON.stringify({ name, widgets, isPublic })
       });
       
       if (!response.ok) {
@@ -444,61 +449,39 @@ const useDashboardStore = create((set, get) => ({
   updateGridColumns: (columns) => set({ gridColumns: columns }),
   setMaxRows: (rows) => set({ maxRows: rows }),
 
-  // ==================== COLLISION DETECTION ====================
+  // ==================== COLLISION DETECTION - DISABLED ====================
+  // FIXED: checkCollision now only validates bounds, NOT overlap with other widgets
   checkCollision: (widget, excludeId = null) => {
     const state = get();
     const { x, y, w, h } = widget.gridArea;
     
+    // Only check canvas boundaries - NO overlap checking
     if (x < 0 || y < 0 || w <= 0 || h <= 0) return true;
     if (x + w > state.gridColumns) return true;
     if (y + h > state.maxRows) return true;
     
-    return state.widgets.some(w => {
-      if (w.id === excludeId) return false;
-      const area = w.gridArea;
-      return !(x >= area.x + area.w || area.x >= x + w || y >= area.y + area.h || area.y >= y + h);
-    });
+    // REMOVED: Widget overlap checking - widgets can now overlap freely
+    return false;
   },
+  
+  // FIXED: findEmptySpace now simply places widgets at the end
   findEmptySpace: (width, height) => {
     const state = get();
-    const maxColumns = state.gridColumns;
-    const maxRows = state.maxRows;
     
-    // FIXED: Check ALL positions systematically, not just after existing widgets
-    // This allows filling gaps in the grid
-    
-    // Strategy 1: Try to place in first few rows (preferred for UX)
-    for (let y = 0; y <= Math.min(3, maxRows - height); y++) {
-      for (let x = 0; x <= maxColumns - width; x++) {
-        const testWidget = { gridArea: { x, y, w: width, h: height } };
-        if (!state.checkCollision(testWidget)) {
-          return { x, y };
-        }
-      }
+    // Simple strategy: Place at x=0, below all existing widgets
+    if (state.widgets.length === 0) {
+      return { x: 0, y: 0 };
     }
     
-    // Strategy 2: Check all remaining rows
-    for (let y = 4; y <= maxRows - height; y++) {
-      for (let x = 0; x <= maxColumns - width; x++) {
-        const testWidget = { gridArea: { x, y, w: width, h: height } };
-        if (!state.checkCollision(testWidget)) {
-          return { x, y };
-        }
-      }
-    }
-    
-    // Strategy 3: If no space found, place below all widgets
     const maxY = Math.max(
       ...state.widgets.map(w => w.gridArea.y + w.gridArea.h), 
       0
     );
     
-    // Try to place at x=0 below everything
-    const finalY = Math.min(maxY, maxRows - height);
-    return { x: 0, y: finalY };
+    return { x: 0, y: Math.min(maxY, state.maxRows - height) };
   },
 
-  // ==================== WIDGET SELECTION - FIXED ====================
+  // ==================== WIDGET SELECTION ====================
   selectWidget: (widgetId, multiSelect = false) => {
     set((state) => {
       const isAlreadySelected = state.selectedWidgetIds.includes(widgetId);
@@ -594,7 +577,8 @@ const useDashboardStore = create((set, get) => ({
     get().autoSave();
   },
 
-  updateWidgetGridArea: (widgetId, gridArea, checkCollision = true) => {
+  // FIXED: updateWidgetGridArea with NO collision checking
+  updateWidgetGridArea: (widgetId, gridArea, checkCollision = false) => {
     const state = get();
     const widget = state.widgets.find(w => w.id === widgetId);
     if (!widget) return false;
@@ -602,6 +586,7 @@ const useDashboardStore = create((set, get) => ({
     const maxColumns = state.gridColumns;
     const maxRows = state.maxRows;
     
+    // Only constrain to canvas boundaries
     const constrainedArea = {
       x: Math.max(0, Math.min(gridArea.x, maxColumns - gridArea.w)),
       y: Math.max(0, Math.min(gridArea.y, maxRows - gridArea.h)),
@@ -616,10 +601,7 @@ const useDashboardStore = create((set, get) => ({
       constrainedArea.h = maxRows - constrainedArea.y;
     }
     
-    if (checkCollision) {
-      const testWidget = { gridArea: constrainedArea };
-      if (state.checkCollision(testWidget, widgetId)) return false;
-    }
+    // REMOVED: Collision checking - widgets can now be placed anywhere
     
     set((state) => ({
       widgets: state.widgets.map((w) => 

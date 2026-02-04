@@ -1,10 +1,10 @@
-// src/components/Widgets/ListWidget.jsx
+// ============= ListWidget.jsx =============
 import React from 'react';
 import { CheckCircle2, AlertCircle, Info, XCircle } from 'lucide-react';
 
 const ListWidget = ({ data }) => {
   const getIcon = (iconName, color) => {
-    const iconProps = { size: 18, style: { color } };
+    const iconProps = { size: 18, style: { color }, strokeWidth: 2.5 };
     
     switch (iconName) {
       case 'check':
@@ -23,16 +23,11 @@ const ListWidget = ({ data }) => {
   const items = data.items || [];
 
   return (
-    <div
-      className="h-full flex flex-col"
-      style={{ backgroundColor: data.backgroundColor || '#ffffff' }}
-    >
+    <div className="h-full flex flex-col bg-white rounded-lg shadow-md border border-gray-200">
       {/* Header */}
       {data.title && (
-        <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: data.showDividers ? '#e5e7eb' : 'transparent' }}>
-          <h3 className="text-base font-semibold text-gray-800">
-            {data.title}
-          </h3>
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+          <h3 className="text-base font-bold text-gray-800">{data.title}</h3>
         </div>
       )}
 
@@ -41,7 +36,7 @@ const ListWidget = ({ data }) => {
         {items.map((item, index) => (
           <div
             key={index}
-            className={`px-5 py-3 flex items-start gap-3 hover:bg-gray-50/70 transition-colors ${
+            className={`px-6 py-4 flex items-start gap-3 hover:bg-gray-50 transition-colors ${
               data.showDividers && index < items.length - 1 ? 'border-b border-gray-100' : ''
             }`}
           >
@@ -51,13 +46,9 @@ const ListWidget = ({ data }) => {
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-800">
-                {item.label}
-              </div>
+              <div className="text-sm font-semibold text-gray-800">{item.label}</div>
               {item.description && (
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {item.description}
-                </div>
+                <div className="text-xs text-gray-500 mt-1 font-medium">{item.description}</div>
               )}
             </div>
           </div>

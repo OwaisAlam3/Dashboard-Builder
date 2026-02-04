@@ -1,20 +1,34 @@
-// src/components/Widgets/LineChartWidget.jsx
+// src/components/Widgets/LineChartWidget.jsx - ADMIN PANEL DESIGN: Professional chart with card style
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const LineChartWidget = ({ data }) => {
   const chartData = data.data || [];
   const xKey = data.xAxisKey || 'month';
   const yKey = data.yAxisKey || 'value';
 
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white px-4 py-2 rounded-md shadow-lg border border-gray-200">
+          <p className="text-xs font-semibold text-gray-600 mb-1">{payload[0].payload[xKey]}</p>
+          <p className="text-base font-bold text-gray-800">
+            {payload[0].value.toLocaleString()}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div
-      className="h-full flex flex-col p-5"
+      className="h-full flex flex-col bg-white rounded-lg shadow-md border border-gray-200"
       style={{ backgroundColor: data.backgroundColor || '#ffffff' }}
     >
-      {/* Header */}
-      <div className="mb-4">
-        <h3 className="text-base font-semibold text-gray-800">
+      {/* Header with card style */}
+      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+        <h3 className="text-base font-bold text-gray-800">
           {data.title || 'Chart'}
         </h3>
         {data.subtitle && (
@@ -25,41 +39,55 @@ const LineChartWidget = ({ data }) => {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 p-5">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <defs>
+              <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={data.lineColor || '#3b82f6'} stopOpacity={0.1}/>
+                <stop offset="95%" stopColor={data.lineColor || '#3b82f6'} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
             {data.showGrid && (
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="#e5e7eb" 
+                vertical={false}
+              />
             )}
             <XAxis 
               dataKey={xKey} 
-              tick={{ fill: '#6b7280', fontSize: 12 }}
-              axisLine={{ stroke: '#e5e7eb' }}
+              tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 600 }}
+              axisLine={{ stroke: '#d1d5db' }}
               tickLine={false}
+              dy={10}
             />
             <YAxis 
-              tick={{ fill: '#6b7280', fontSize: 12 }}
-              axisLine={{ stroke: '#e5e7eb' }}
+              tick={{ fill: '#6b7280', fontSize: 11, fontWeight: 600 }}
+              axisLine={{ stroke: '#d1d5db' }}
               tickLine={false}
+              dx={-10}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#ffffff',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '13px',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              }}
-              cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }}
-            />
+            <Tooltip content={<CustomTooltip />} />
+            {data.showLegend && <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />}
             <Line
               type={data.smooth ? 'monotone' : 'linear'}
               dataKey={yKey}
               stroke={data.lineColor || '#3b82f6'}
-              strokeWidth={2}
-              dot={data.showDots ? { fill: data.lineColor || '#3b82f6', strokeWidth: 0, r: 4 } : false}
-              activeDot={{ r: 6, fill: data.lineColor || '#3b82f6' }}
+              strokeWidth={3}
+              dot={{ 
+                fill: '#ffffff', 
+                stroke: data.lineColor || '#3b82f6',
+                strokeWidth: 2,
+                r: 4 
+              }}
+              activeDot={{ 
+                r: 6, 
+                fill: data.lineColor || '#3b82f6',
+                stroke: '#ffffff',
+                strokeWidth: 2
+              }}
+              fill="url(#colorValue)"
             />
           </LineChart>
         </ResponsiveContainer>

@@ -1,11 +1,9 @@
-// backend/routes/dashboards.js
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// Validate widget structure
 const validateWidget = (widget) => {
   if (!widget.id || typeof widget.id !== 'string') return false;
   if (!widget.type || typeof widget.type !== 'string') return false;
@@ -18,7 +16,6 @@ const validateWidget = (widget) => {
   return true;
 };
 
-// GET all dashboards
 router.get('/', async (req, res, next) => {
   try {
     const { limit = 100, offset = 0 } = req.query;
@@ -35,7 +32,6 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// GET single dashboard
 router.get('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -51,13 +47,51 @@ router.get('/:id', async (req, res, next) => {
       });
     }
 
+    // Public dashboards are always accessible
+    if (!dashboard.isPublic) {
+      // Private dashboards require a valid embed token
+      const embedToken = req.headers['x-embed-token'];
+
+      if (!embedToken) {
+        return res.status(403).json({
+          error: 'Access denied: dashboard is private and no embed token was provided'
+        });
+      }
+
+      const storedToken = await prisma.embedToken.findFirst({
+        where: {
+          token: embedToken,
+          dashboardId: id
+        }
+      });
+
+      if (!storedToken) {
+        return res.status(403).json({
+          error: 'Access denied: invalid embed token'
+        });
+      }
+
+      if (new Date() > new Date(storedToken.expiresAt)) {
+        // Clean up the expired token while we're here
+        await prisma.embedToken.delete({ where: { id: storedToken.id } });
+        return res.status(403).json({
+          error: 'Access denied: embed token has expired'
+        });
+      }
+
+      // Token is valid — update lastUsedAt
+      await prisma.embedToken.update({
+        where: { id: storedToken.id },
+        data: { lastUsedAt: new Date() }
+      });
+    }
+
     res.json(dashboard);
   } catch (error) {
     next(error);
   }
 });
 
-// POST create dashboard
 router.post('/', async (req, res, next) => {
   try {
     const { name, widgets } = req.body;
@@ -74,7 +108,6 @@ router.post('/', async (req, res, next) => {
       });
     }
 
-    // Validate each widget
     for (let i = 0; i < widgets.length; i++) {
       if (!validateWidget(widgets[i])) {
         return res.status(400).json({ 
@@ -97,7 +130,6 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// PUT update dashboard
 router.put('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -121,7 +153,6 @@ router.put('/:id', async (req, res, next) => {
         });
       }
       
-      // Validate each widget
       for (let i = 0; i < widgets.length; i++) {
         if (!validateWidget(widgets[i])) {
           return res.status(400).json({ 
@@ -157,7 +188,6 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-// DELETE dashboard
 router.delete('/:id', async (req, res, next) => {
   try {
     const { id } = req.params;

@@ -29,10 +29,10 @@
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "cors": "^2.8.5",
-    "express": "^4.21.1"
+    "express": "^4.21.1",
+    "dotenv": "^16.6.1"
   },
   "devDependencies": {
-    "dotenv": "^16.6.1",
     "nodemon": "^3.1.7",
     "prisma": "^5.22.0"
   },

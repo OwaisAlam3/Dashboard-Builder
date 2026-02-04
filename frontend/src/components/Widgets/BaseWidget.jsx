@@ -5,7 +5,7 @@ import useDashboardStore from '../../store/dashboardStore';
 import { WIDGET_COMPONENTS } from './index';
 import GRID_CONFIG from '../../config/gridConfig';
 
-const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) => {
+const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom, readOnly = false, embedMode = false }) => {
   const widgetRef = useRef(null);
   const cleanupRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -28,6 +28,9 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
   const isSelected = selectedWidgetIds.includes(widget.id);
   const isLocked = widget.locked;
 
+  // Disable all interactions in read-only mode
+  const isInteractionDisabled = readOnly || embedMode;
+
   // Calculate pixel positions
   const columnWidth = GRID_CONFIG.getPixelWidth(1, containerWidth, gridColumns);
   const pixelX = widget.gridArea.x * (columnWidth + GRID_CONFIG.gap);
@@ -37,6 +40,8 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
 
   // Handle widget click
   const handleWidgetClick = useCallback((e) => {
+    if (isInteractionDisabled) return;
+    
     if (
       e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' ||
       e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON' ||
@@ -51,11 +56,11 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
     if (!isSelected) {
       selectWidget(widget.id, e.metaKey || e.ctrlKey || e.shiftKey);
     }
-  }, [widget.id, selectWidget, isPanning, isDragging, isResizing, isSelected]);
+  }, [widget.id, selectWidget, isPanning, isDragging, isResizing, isSelected, isInteractionDisabled]);
 
   // Drag start
   const handleMouseDown = useCallback((e) => {
-    if (isLocked || e.button !== 0 || isPanning) return;
+    if (isInteractionDisabled || isLocked || e.button !== 0 || isPanning) return;
     
     if (
       e.target.closest('.resize-handle') || e.target.tagName === 'INPUT' ||
@@ -80,11 +85,11 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
 
     document.body.classList.add('is-dragging');
     document.body.style.userSelect = 'none';
-  }, [isLocked, widget.gridArea, widget.id, isSelected, selectWidget, setGlobalDragging, isPanning]);
+  }, [isInteractionDisabled, isLocked, widget.gridArea, widget.id, isSelected, selectWidget, setGlobalDragging, isPanning]);
 
   // Resize start
   const handleResizeStart = useCallback((direction) => (e) => {
-    if (isLocked || isPanning) return;
+    if (isInteractionDisabled || isLocked || isPanning) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -98,7 +103,7 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
 
     document.body.classList.add('is-dragging');
     document.body.style.userSelect = 'none';
-  }, [isLocked, widget.gridArea, setGlobalResizing, isPanning]);
+  }, [isInteractionDisabled, isLocked, widget.gridArea, setGlobalResizing, isPanning]);
 
   // Mouse move
   useEffect(() => {
@@ -169,14 +174,11 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
 
       if (isDragging || isResizing) {
         if (ghostPosition) {
-          const hasCollision = checkCollision({ gridArea: ghostPosition }, widget.id);
-          
-          if (!hasCollision) {
-            updateWidgetGridArea(widget.id, ghostPosition, false);
-            const store = useDashboardStore.getState();
-            store.saveToHistory();
-            store.autoSave();
-          }
+          // FIXED: No collision checking - always allow placement
+          updateWidgetGridArea(widget.id, ghostPosition, false);
+          const store = useDashboardStore.getState();
+          store.saveToHistory();
+          store.autoSave();
         }
       }
 
@@ -203,7 +205,7 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
   }, [
     isDragging, isResizing, resizeDirection, dragStart, initialGridArea,
     widget.id, columnWidth, gridColumns, updateWidgetGridArea,
-    setGlobalDragging, setGlobalResizing, checkCollision, ghostPosition, canvasZoom,
+    canvasZoom, ghostPosition, setGlobalDragging, setGlobalResizing
   ]);
 
   // Cleanup on unmount
@@ -215,29 +217,34 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
 
   // Toolbar actions
   const handleDuplicate = useCallback((e) => {
+    if (isInteractionDisabled) return;
     e.stopPropagation();
     duplicateWidget(widget.id);
-  }, [duplicateWidget, widget.id]);
+  }, [duplicateWidget, widget.id, isInteractionDisabled]);
 
   const handleDelete = useCallback((e) => {
+    if (isInteractionDisabled) return;
     e.stopPropagation();
     deleteWidget(widget.id);
-  }, [deleteWidget, widget.id]);
+  }, [deleteWidget, widget.id, isInteractionDisabled]);
 
   const handleLockToggle = useCallback((e) => {
+    if (isInteractionDisabled) return;
     e.stopPropagation();
     toggleWidgetLock(widget.id);
-  }, [toggleWidgetLock, widget.id]);
+  }, [toggleWidgetLock, widget.id, isInteractionDisabled]);
 
   const handleBringToFront = useCallback((e) => {
+    if (isInteractionDisabled) return;
     e.stopPropagation();
     bringToFront(widget.id);
-  }, [bringToFront, widget.id]);
+  }, [bringToFront, widget.id, isInteractionDisabled]);
 
   const handleSendToBack = useCallback((e) => {
+    if (isInteractionDisabled) return;
     e.stopPropagation();
     sendToBack(widget.id);
-  }, [sendToBack, widget.id]);
+  }, [sendToBack, widget.id, isInteractionDisabled]);
 
   // Resize handles
   const resizeHandles = [
@@ -257,29 +264,28 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
   const ghostPixelWidth = ghostPosition ? GRID_CONFIG.getPixelWidth(ghostPosition.w, containerWidth, gridColumns) : null;
   const ghostPixelHeight = ghostPosition ? GRID_CONFIG.getPixelHeight(ghostPosition.h) : null;
 
-  const hasGhostCollision = ghostPosition ? checkCollision({ gridArea: ghostPosition }, widget.id) : false;
+  // FIXED: No collision detection - always show valid (blue) ghost
+  const hasGhostCollision = false;
 
   const handleSize = Math.min(12, Math.max(8, 10 / canvasZoom));
 
   // Toolbar visibility
   const handleMouseEnter = useCallback(() => {
-    if (!isDragging && !isResizing) {
-      setHoveredWidget(widget.id);
-      setShowToolbar(true);
-    }
-  }, [isDragging, isResizing, setHoveredWidget, widget.id]);
+    if (isInteractionDisabled || isDragging || isResizing) return;
+    setHoveredWidget(widget.id);
+    setShowToolbar(true);
+  }, [isDragging, isResizing, setHoveredWidget, widget.id, isInteractionDisabled]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!isDragging && !isResizing) {
-      setHoveredWidget(null);
-      setShowToolbar(false);
-    }
-  }, [isDragging, isResizing, setHoveredWidget]);
+    if (isInteractionDisabled || isDragging || isResizing) return;
+    setHoveredWidget(null);
+    setShowToolbar(false);
+  }, [isDragging, isResizing, setHoveredWidget, isInteractionDisabled]);
 
   return (
     <>
       {/* Ghost widget */}
-      {(isDragging || isResizing) && ghostPosition && (
+      {!isInteractionDisabled && (isDragging || isResizing) && ghostPosition && (
         <div
           className={`absolute pointer-events-none rounded-lg border-2 transition-all duration-75 ${
             hasGhostCollision ? 'border-red-500 bg-red-500/10' : 'border-blue-500 bg-blue-500/10'
@@ -306,7 +312,7 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
       <div
         ref={widgetRef}
         className={`absolute select-none transition-all duration-75 ${
-          isLocked ? 'cursor-not-allowed' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          isInteractionDisabled ? 'cursor-default' : isLocked ? 'cursor-not-allowed' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
         } ${(isDragging || isResizing) ? 'opacity-40' : ''}`}
         style={{
           left: pixelX, 
@@ -317,18 +323,18 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
           opacity: (isDragging || isResizing) ? 0.4 : widget.opacity,
           pointerEvents: 'auto',
         }}
-        onMouseDown={handleMouseDown}
-        onClick={handleWidgetClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseDown={!isInteractionDisabled ? handleMouseDown : undefined}
+        onClick={!isInteractionDisabled ? handleWidgetClick : undefined}
+        onMouseEnter={!isInteractionDisabled ? handleMouseEnter : undefined}
+        onMouseLeave={!isInteractionDisabled ? handleMouseLeave : undefined}
       >
         {/* Selection border - refined */}
-        {isSelected && !isDragging && !isResizing && (
+        {!isInteractionDisabled && isSelected && !isDragging && !isResizing && (
           <div className="absolute -inset-px border-2 border-blue-500 rounded-lg pointer-events-none shadow-lg shadow-blue-500/20" />
         )}
 
         {/* Floating toolbar - refined design */}
-        {(showToolbar || isSelected) && !isDragging && !isResizing && (
+        {!isInteractionDisabled && (showToolbar || isSelected) && !isDragging && !isResizing && (
           <div className="absolute -top-10 left-0 right-0 flex items-center justify-between px-2 py-1.5 bg-gray-900/95 backdrop-blur-sm rounded-t-lg animate-slideIn no-print z-50 border border-gray-700/50">
             <div className="flex items-center gap-1.5">
               <GripVertical size={14} className="text-gray-400" />
@@ -382,7 +388,7 @@ const BaseWidget = memo(({ widget, containerWidth, gridColumns, canvasZoom }) =>
         </div>
 
         {/* Resize handles - refined */}
-        {isSelected && !isLocked && !isDragging && !isResizing && (
+        {!isInteractionDisabled && isSelected && !isLocked && !isDragging && !isResizing && (
           <>
             {resizeHandles.map((handle) => (
               <div
