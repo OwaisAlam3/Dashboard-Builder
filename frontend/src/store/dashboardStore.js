@@ -24,6 +24,29 @@ const createDebounce = () => {
 
 const debounceAutoSave = createDebounce();
 
+// Helper to constrain widget to grid boundaries
+const constrainWidgetToGrid = (widget, gridColumns, maxRows) => {
+  const { x, y, w, h } = widget.gridArea;
+  
+  // Constrain width and height to grid size
+  const constrainedW = Math.min(w, gridColumns);
+  const constrainedH = Math.min(h, maxRows);
+  
+  // Constrain position so widget doesn't exceed boundaries
+  const constrainedX = Math.max(0, Math.min(x, gridColumns - constrainedW));
+  const constrainedY = Math.max(0, Math.min(y, maxRows - constrainedH));
+  
+  return {
+    ...widget,
+    gridArea: {
+      x: constrainedX,
+      y: constrainedY,
+      w: constrainedW,
+      h: constrainedH
+    }
+  };
+};
+
 const useDashboardStore = create((set, get) => ({
   // ==================== UI STATE ====================
   sidebarOpen: true,
@@ -148,10 +171,12 @@ const useDashboardStore = create((set, get) => ({
       
       const dashboard = await response.json();
       
+      const state = get();
+      
       set({ 
         currentDashboardId: dashboard.id,
         currentDashboardName: dashboard.name,
-        widgets: dashboard.widgets || [],
+        widgets: (dashboard.widgets || []).map(w => constrainWidgetToGrid(w, state.gridColumns, state.maxRows)),
         selectedWidgetIds: [],
         propertyPanelOpen: false,
         hasUnsavedChanges: false,
@@ -185,10 +210,12 @@ const useDashboardStore = create((set, get) => ({
       
       const dashboard = await response.json();
       
+      const state = get();
+      
       set({ 
         currentDashboardId: dashboard.id,
         currentDashboardName: dashboard.name,
-        widgets: dashboard.widgets,
+        widgets: (dashboard.widgets || []).map(w => constrainWidgetToGrid(w, state.gridColumns, state.maxRows)),
         hasUnsavedChanges: false,
         selectedWidgetIds: [],
         propertyPanelOpen: false,

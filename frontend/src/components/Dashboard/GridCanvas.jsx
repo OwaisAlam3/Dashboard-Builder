@@ -25,6 +25,8 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
     setMaxRows,
     isDragging,
     isResizing,
+    sidebarOpen,
+    propertyPanelOpen,
   } = useDashboardStore();
 
   const [isPanningLocal, setIsPanningLocal] = useState(false);
@@ -61,15 +63,13 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
         const containerWidth = container.clientWidth;
         const containerHeight = container.clientHeight;
         
-        // Add padding
         const padding = 32;
         const availableWidth = containerWidth - padding * 2;
         const availableHeight = containerHeight - padding * 2;
         
-        // Calculate scale to fit
         const scaleX = availableWidth / CANVAS_WIDTH;
         const scaleY = availableHeight / CANVAS_HEIGHT;
-        const scale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 1
+        const scale = Math.min(scaleX, scaleY, 1);
         
         setEmbedScale(scale);
       };
@@ -238,32 +238,50 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
     }
   }, [isPanningLocal, selectionBox, handleCanvasMouseMove, handleCanvasMouseUp, isInteractionDisabled]);
 
+  // PROFESSIONAL ZOOM: Simple, reliable, Figma-like behavior
   const handleWheel = useCallback((e) => {
-    if ((e.ctrlKey || e.metaKey) && canvasRef.current?.contains(e.target)) {
+    if (!canvasRef.current?.contains(e.target)) return;
+
+    // Zoom with Ctrl/Cmd key
+    if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       e.stopPropagation();
       
-      const rect = canvasRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      const container = canvasRef.current;
+      const rect = container.getBoundingClientRect();
       
-      const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      const newZoom = Math.max(0.1, Math.min(5, canvasZoom + delta));
+      // Mouse position in viewport
+      const viewportX = e.clientX - rect.left;
+      const viewportY = e.clientY - rect.top;
+      
+      // Current scroll position
+      const scrollLeft = container.scrollLeft;
+      const scrollTop = container.scrollTop;
+      
+      // Point in the scrollable area (before zoom)
+      const pointX = scrollLeft + viewportX;
+      const pointY = scrollTop + viewportY;
+      
+      // Calculate new zoom
+      const wheelDelta = -e.deltaY;
+      const isTrackpad = Math.abs(e.deltaY) < 50;
+      const zoomSensitivity = isTrackpad ? 0.003 : 0.001;
+      const zoomDelta = wheelDelta * zoomSensitivity;
+      const newZoom = Math.max(0.1, Math.min(5, canvasZoom + zoomDelta));
       
       if (newZoom === canvasZoom) return;
       
-      const scrollLeft = canvasRef.current.scrollLeft;
-      const scrollTop = canvasRef.current.scrollTop;
-      
-      const zoomPointX = (scrollLeft + mouseX) / canvasZoom;
-      const zoomPointY = (scrollTop + mouseY) / canvasZoom;
+      // Calculate zoom ratio
+      const zoomRatio = newZoom / canvasZoom;
       
       setCanvasZoom(newZoom);
       
+      // After zoom, adjust scroll to keep the point under the mouse
       requestAnimationFrame(() => {
-        if (canvasRef.current) {
-          canvasRef.current.scrollLeft = zoomPointX * newZoom - mouseX;
-          canvasRef.current.scrollTop = zoomPointY * newZoom - mouseY;
+        if (container) {
+          // The point scales by the zoom ratio
+          container.scrollLeft = pointX * zoomRatio - viewportX;
+          container.scrollTop = pointY * zoomRatio - viewportY;
         }
       });
     }
@@ -326,15 +344,17 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
     );
   }
 
+  // SIMPLIFIED WRAPPER: Fixed large size to accommodate all zoom levels
+  // This prevents any shifting during zoom operations
+  const WRAPPER_PADDING = 3000; // Large fixed padding for smooth panning at any zoom
+  
   const wrapperStyle = {
     position: 'absolute',
     left: '50%',
     top: '50%',
     transform: 'translate(-50%, -50%)',
-    width: CANVAS_WIDTH * canvasZoom + 256,
-    height: CANVAS_HEIGHT * canvasZoom + 256,
-    minWidth: CANVAS_WIDTH * canvasZoom + 256,
-    minHeight: CANVAS_HEIGHT * canvasZoom + 256,
+    width: WRAPPER_PADDING * 2,
+    height: WRAPPER_PADDING * 2,
   };
 
   return (
@@ -345,6 +365,7 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
       style={{ cursor: getCursorStyle() }}
     >
       <div style={wrapperStyle}>
+        {/* Content centered in the large wrapper */}
         <div
           style={{
             position: 'absolute',
@@ -355,7 +376,7 @@ const GridCanvas = ({ embedMode = false, readOnly = false }) => {
         >
           <div
             ref={contentRef}
-            className="origin-center relative canvas-boundary"
+            className="relative canvas-boundary"
             style={{
               width: CANVAS_WIDTH,
               height: CANVAS_HEIGHT,

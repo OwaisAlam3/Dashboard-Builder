@@ -1,4 +1,4 @@
-// backend/prisma/seed.js - ADMIN PANEL TEMPLATES: Professional dashboard designs
+// backend/prisma/seed.js - FIXED: All templates fit within 24 columns × 10 rows grid
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
@@ -117,11 +117,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Charts Row
+      // Charts Row - FIXED: Reduced height to fit
       {
         id: 'line-chart-1',
         type: 'lineChart',
-        gridArea: { x: 0, y: 3, w: 16, h: 6 },
+        gridArea: { x: 0, y: 3, w: 16, h: 4 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -149,7 +149,7 @@ const DASHBOARD_TEMPLATES = {
       {
         id: 'pie-chart-1',
         type: 'pieChart',
-        gridArea: { x: 16, y: 3, w: 8, h: 6 },
+        gridArea: { x: 16, y: 3, w: 8, h: 4 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -171,11 +171,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Table
+      // Table - FIXED: Moved to y=7, height reduced to 3 to fit in 10 rows
       {
         id: 'table-1',
         type: 'table',
-        gridArea: { x: 0, y: 9, w: 24, h: 5 },
+        gridArea: { x: 0, y: 7, w: 24, h: 3 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -197,8 +197,6 @@ const DASHBOARD_TEMPLATES = {
             { id: '#10235', customer: 'Jane Smith', product: 'iPhone 15 Pro', date: 'Jan 28, 2026', amount: '€1,199', status: 'Processing' },
             { id: '#10236', customer: 'Bob Johnson', product: 'iPad Air', date: 'Jan 27, 2026', amount: '€649', status: 'Shipped' },
             { id: '#10237', customer: 'Alice Brown', product: 'AirPods Pro', date: 'Jan 27, 2026', amount: '€279', status: 'Pending' },
-            { id: '#10238', customer: 'Charlie Wilson', product: 'Apple Watch Ultra', date: 'Jan 26, 2026', amount: '€849', status: 'Completed' },
-            { id: '#10239', customer: 'Diana Prince', product: 'Magic Keyboard', date: 'Jan 26, 2026', amount: '€349', status: 'Shipped' },
           ],
           striped: true,
           showHeader: true,
@@ -258,11 +256,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Charts
+      // Charts - FIXED: Adjusted positions and heights
       {
         id: 'line-chart-1',
         type: 'lineChart',
-        gridArea: { x: 0, y: 4, w: 12, h: 5 },
+        gridArea: { x: 0, y: 4, w: 12, h: 3 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -270,15 +268,14 @@ const DASHBOARD_TEMPLATES = {
         zIndex: 2,
         data: {
           title: 'Website Traffic',
-          subtitle: 'Daily visitors',
+          subtitle: 'Last 6 months',
           data: [
-            { month: 'Mon', value: 12400 },
-            { month: 'Tue', value: 13200 },
-            { month: 'Wed', value: 14100 },
-            { month: 'Thu', value: 12800 },
-            { month: 'Fri', value: 15600 },
-            { month: 'Sat', value: 11200 },
-            { month: 'Sun', value: 10800 },
+            { month: 'Jan', value: 125000 },
+            { month: 'Feb', value: 138000 },
+            { month: 'Mar', value: 142000 },
+            { month: 'Apr', value: 156000 },
+            { month: 'May', value: 168000 },
+            { month: 'Jun', value: 182000 },
           ],
           xAxisKey: 'month',
           yAxisKey: 'value',
@@ -291,7 +288,7 @@ const DASHBOARD_TEMPLATES = {
       {
         id: 'bar-chart-1',
         type: 'barChart',
-        gridArea: { x: 12, y: 4, w: 12, h: 5 },
+        gridArea: { x: 12, y: 4, w: 12, h: 3 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -314,11 +311,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Activity List
+      // Activity List - FIXED: Moved to y=7, height 3 to fit in 10 rows
       {
         id: 'list-1',
         type: 'list',
-        gridArea: { x: 0, y: 9, w: 24, h: 4 },
+        gridArea: { x: 0, y: 7, w: 24, h: 3 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -331,7 +328,6 @@ const DASHBOARD_TEMPLATES = {
             { label: 'Order #10234 placed', description: '15 minutes ago', icon: 'check', iconColor: '#10b981' },
             { label: 'Payment received: €2,499', description: '1 hour ago', icon: 'check', iconColor: '#3b82f6' },
             { label: 'Support ticket #542 opened', description: '2 hours ago', icon: 'alert', iconColor: '#f59e0b' },
-            { label: 'Product review submitted', description: '3 hours ago', icon: 'info', iconColor: '#6b7280' },
           ],
           showIcons: true,
           showDividers: true,
@@ -425,11 +421,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Sales Chart
+      // Sales Chart and Status Board - FIXED: Adjusted heights
       {
         id: 'bar-chart-1',
         type: 'barChart',
-        gridArea: { x: 0, y: 3, w: 14, h: 5 },
+        gridArea: { x: 0, y: 3, w: 14, h: 4 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -456,7 +452,7 @@ const DASHBOARD_TEMPLATES = {
       {
         id: 'status-board-1',
         type: 'statusBoard',
-        gridArea: { x: 14, y: 3, w: 10, h: 5 },
+        gridArea: { x: 14, y: 3, w: 10, h: 4 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -474,11 +470,11 @@ const DASHBOARD_TEMPLATES = {
         }
       },
 
-      // Orders Table
+      // Orders Table - FIXED: Moved to y=7, height 3 to fit in 10 rows
       {
         id: 'table-1',
         type: 'table',
-        gridArea: { x: 0, y: 8, w: 24, h: 5 },
+        gridArea: { x: 0, y: 7, w: 24, h: 3 },
         rotation: 0,
         locked: false,
         visible: true,
@@ -499,7 +495,6 @@ const DASHBOARD_TEMPLATES = {
             { id: '#10235', customer: 'Jane Smith', product: 'Smart Watch', date: 'Jan 28', amount: '€299', status: 'Processing' },
             { id: '#10236', customer: 'Bob Johnson', product: 'Laptop Bag', date: 'Jan 27', amount: '€45', status: 'Completed' },
             { id: '#10237', customer: 'Alice Brown', product: 'USB-C Cable', date: 'Jan 27', amount: '€19', status: 'Pending' },
-            { id: '#10238', customer: 'Charlie Wilson', product: 'Keyboard', date: 'Jan 26', amount: '€89', status: 'Shipped' },
           ],
           striped: true,
           showHeader: true,
